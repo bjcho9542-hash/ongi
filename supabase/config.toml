@@ -1,0 +1,14 @@
+[project]
+id = "fxhfjncxyheohbboapyg"
+
+[api]
+port = 54321
+
+[db]
+port = 54322
+
+[auth]
+site_url = "http://localhost:3000"
+
+[studio]
+port = 54323

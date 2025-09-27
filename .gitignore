@@ -1,0 +1,14 @@
+node_modules/
+ongi-app/node_modules/
+*.log
+.env
+.env.local
+ongi-app/.env.local
+.DS_Store
+
+# Next.js build output
+.next/
+out/
+
+# TypeScript
+*.tsbuildinfo
