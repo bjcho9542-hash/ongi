@@ -1,0 +1,25 @@
+sbp_5a891d276f85e4abcb18f2b22b51bbd7503c3e39
+
+완료했습니다 — 프로젝트에 바로 넣어 쓸 수 있도록 파일들 생성해 두었어요.
+
+아래 링크에서 파일들을 다운로드하세요:
+
+Download PRD.md
+
+Download migrations/001_create_schema.sql
+
+Download migrations/002_rls_policies.sql
+
+Download types/supabase.ts
+
+Download README.md
+
+사용 팁/권장 순서
+
+로컬 프로젝트 루트에 onggi-buffet-prd 폴더를 복사합니다.
+
+Codex CLI에 이 폴더(또는 파일들)를 읽히고, 제가 제공한 Codex 프롬프트(README 안에 있음)를 붙여넣어 지시하세요.
+
+Supabase CLI 또는 psql로 마이그레이션 파일을 적용해 보시고, 오류가 나오면 여기로 복사해서 붙여넣어 주세요 — 함께 고쳐드릴게요.
+
+필요하면 지금 바로 Codex CLI에 넣을 정확한 명령어 프롬프트(한 줄형/긴형)나, Supabase 마이그레이션 실행 시 발생한 에러 로그를 붙여주시면 문제 해결 도와드릴게요.

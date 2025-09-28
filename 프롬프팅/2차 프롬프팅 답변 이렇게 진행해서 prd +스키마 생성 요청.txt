@@ -1,0 +1,97 @@
+짧고 명확하게 정리할게요 — 질문 요지(“스키마는 너가 잘 만들까, 아니면 Codex CLI가 잘 만들까?”)에 대한 답 + 추천 워크플로우와 Codex CLI에 넣을 정확한 프롬프트(붙여넣기용)와 검증 체크리스트를 같이 드립니다.
+
+핵심 요약
+
+제가 할 일(Assistant): 당신이 요청한 **PRD(제품요구서)**를 완성해서 드립니다. PRD에는 권장 DB 스키마(SQL, 테이블/인덱스/RLS 제안), API 명세, 타입스크립트 타입 가이드 등 개발자가 바로 쓸 수 있도록 상세 명세를 포함할 수 있습니다.
+
+Codex CLI(혹은 당신이 실행하는 도구): 실제로 마이그레이션 파일 생성·코드 생성·배포 스크립트를 만들고 실행하는 것은 Codex CLI(또는 당신)가 합니다. Codex CLI가 잘하려면 **명확한 입력(프롬프트 + 기대 출력 예시 + 테스트 방법)**을 줘야 결과가 안정적입니다.
+
+즉: 스키마 설계는 제가 ‘좋은/완전한 스키마’를 제공할 수 있고, Codex CLI는 그 스키마/프롬프트를 바탕으로 실제 마이그레이션 파일이나 코드(예: TypeScript 타입, Supabase 마이그레이션)를 생성하게 됩니다. 품질은 (1) 스키마 설계의 완성도와 (2) Codex CLI에 주는 프롬프트의 명확성에 달려 있습니다. 제가 PRD에 포함해 드리는 스키마는 바로 쓸 수 있도록 실무 기준(제약, 인덱스, 외래키, Storage 경로 등)을 반영합니다.
+
+권장 워크플로우 (권장 순서)
+
+제가 PRD + 완전한 SQL 스키마(마이그레이션용 SQL 포함) 를 챗에 붙여드립니다.
+
+당신(또는 Codex CLI)은 그 SQL을 마이그레이션 파일로 변환하고 Supabase에 적용.
+
+Codex CLI로 프론트엔드 템플릿(Next.js + TS)과 API route 샘플을 생성 — 이때 제가 드리는 프롬프트를 사용.
+
+로컬에서 마이그레이션·타입생성(supabase gen types typescript 등)을 실행해 타입 안정성 확보.
+
+자동화된 간단 테스트(엔드포인트, 업로드, 결제 플로우) 실행으로 검증.
+
+Codex CLI에 넣을 붙여넣기용 프롬프트 예시
+
+(이걸 Codex CLI에 그대로 넣으면 마이그레이션/파일 생성 요청을 하기에 적합합니다.)
+
+Generate a PostgreSQL migration for Supabase based on the following schema requirements:
+
+- Tables: company, admin_user, entry, payment, receipt
+- Use UUID primary keys, timestamps, proper foreign keys, and indexes.
+- Company fields: id, name, code (4 chars unique), contact_name, contact_phone, password_hash, business_number (nullable), address (nullable), created_at, updated_at.
+- Admin_user fields: id, email, name, role ('admin'|'counter'), password_hash, created_at.
+- Entry fields: id, company_id, entry_date (date), count (int), signer (text), created_by (admin_user id), created_at, is_paid (boolean default false), payment_id (nullable).
+- Payment fields: id, company_id, from_date, to_date, total_count, unit_price (default 8000), total_amount (compute or store), paid_at, paid_by, receipt_url, created_at.
+- Receipt table: id, payment_id, file_path, uploaded_by, uploaded_at.
+- Add indexes on company.code, (company_id, entry_date), and payment(company_id, paid_at).
+- Add basic RLS policies: admin can read/write everything; counter can insert entries and create payments but cannot delete companies.
+- Output: 1) SQL migration file content with CREATE TABLE and necessary INDEX and CHECK constraints. 2) Optional: a short README describing how to run the migration with Supabase CLI.
+
+Also generate TypeScript types for the tables in a `types/supabase.ts` file compatible with `createClient<Database>` usage.
+
+
+이 프롬프트로 Codex CLI에 요청하면, CLI가 마이그레이션 SQL + 타입 파일을 생성하도록 유도할 수 있습니다.
+
+제가 PRD에 추가로 포함해 드릴 것들 (원하시면 바로 포함)
+
+완전한 마이그레이션용 SQL (위 요구사항에 맞춘 CREATE TABLE 스크립트) — Supabase에 바로 붙여넣어도 동작하도록 작성.
+
+Supabase용 RLS(예시) 스크립트(Admin/Counter 정책 예시).
+
+types/supabase.d.ts(TypeScript) 자동 생성 예시(수동으로도 쓸 수 있게).
+
+Codex CLI에 복붙 가능한 프롬프트(위 예시 포함) + 실행 순서(명령어 순서 안내).
+
+원하면 PRD에 이 SQL/스크립트들까지 포함해 바로 드리겠습니다.
+
+Codex CLI가 잘 만들게 하는 팁 (안정성 확보)
+
+정확한 스키마(제가 드림)를 먼저 제공 — Codex는 명확한 spec을 잘 따라감.
+
+테스트 케이스(예: sample INSERTs, expected SELECT 결과) 을 같이 주면 생성물 품질↑.
+
+TypeScript 타입 생성 명령어(supabase gen types typescript --schema public > types/supabase.ts) 같은 실행 지시 포함.
+
+서비스 키 노출 주의: Codex가 생성한 코드에서 service_role 키가 클라이언트에 묻히지 않도록 프롬프트에 분명히 명시하세요.
+
+로컬 실행·테스트: 생성 후 즉시 psql 또는 Supabase CLI로 마이그레이션 실행하여 오류 발견 → 수정. Codex에게 "if SQL fails, explain errors and suggest fixes" 같이 추가 프롬프트를 줘도 좋음.
+
+검증 체크리스트 (Codex가 만든 결과를 당신이/테스트 스크립트가 확인할 항목)
+
+SQL 문법 오류 없이 supabase db reset 또는 psql로 실행되는지.
+
+외래키/인덱스/유니크 제약(회사코드 4자리 유니크 등)이 의도대로 작동하는지.
+
+Entry 추가 → Payment 생성 흐름(Entry.is_paid 업데이트, payment_id 연결) 정상 동작.
+
+Supabase Storage private 버킷에 업로드 후 Signed URL 발급/조회 가능.
+
+타입스크립트 타입(생성된 types/supabase.ts)로 컴파일 에러 없는지(Next.js 프로젝트에서).
+
+RLS 정책(관리자/카운터) 동작 테스트: counter로 로그인 시 회사 삭제 불가 등.
+
+결론(한 문장)
+
+제가 PRD + 완전한 스키마(SQL + RLS + 타입 예시)를 잘 만들어 드릴게요.
+
+Codex CLI는 그 스키마와 프롬프트를 받아 실제 마이그레이션/코드/타입 파일을 생성합니다 — 품질은 제공하는 프롬프트의 명확성과 검증(테스트)의 정도에 따라 달라집니다.
+
+원하시면 지금 PRD에 포함될 마이그레이션 SQL + RLS + types 파일을 제가 바로 여기 채팅으로 붙여드릴게요. PRD는 여러분이 Codex CLI로 바로 넘길 수 있게, 그 SQL과 함께 Codex용 프롬프트도 포함해서 드립니다. 진행할까요?
+
+
+
+
+요청 
+지금 위 내용을 PRD 문서와 스키마 문서를 cli가 잘 알수있게 파일형식으로 내가 다운받을수 있게 만들어줘 그거 바로 프로젝트 폴더에 넣어서 코덱스한테 읽히면 알수있게 가능해 ?
+
+
