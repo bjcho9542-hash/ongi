@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev:*)",
+      "Bash(find:*)",
+      "Bash(tree:*)",
+      "Bash(npm install:*)",
+      "Bash(claude mcp add:*)",
+      "Bash(claude mcp)",
+      "Bash(claude mcp:*)",
+      "WebSearch",
+      "Bash(git clone:*)",
+      "Bash(npm run build:*)",
+      "Read(//c/Users/cho/Desktop/bjcho9542/**)",
+      "Bash(mkdir:*)",
+      "Bash(npx next build:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(py --version)",
+      "Bash(git pull:*)",
+      "Bash(git restore:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
