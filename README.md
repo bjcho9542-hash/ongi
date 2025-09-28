@@ -73,7 +73,7 @@ Tasks:
 - [ ] 감사 로그 테이블과 연동되는 서버 로직 구현
 
 ### 프론트엔드 미완료 정리
-- [ ] Tailwind CSS 관련 패키지 실제 설치 및 `npm run dev`/`npm run build` 재검증 (네트워크 문제로 미설치 상태)
+- [x] Tailwind CSS 관련 패키지 실제 설치 및 `npm run dev`/`npm run build` 재검증
 - [ ] 카운터 감사 로그 뷰 및 관련 UI 구현 (`src/components/counter/counter-dashboard.tsx`에 미구현)
 - [ ] CSV/상세 리포트 다운로드 흐름과 결제/영수증 다운로드 UX 개선
 - [ ] 관리자 PIN 초기화·변경, 감사 로그 UI 등 보안/운영용 화면 추가 (`src/app/(protected)/admin/page.tsx` 기준)

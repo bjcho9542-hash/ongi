@@ -190,156 +190,6 @@ function SummaryCards({ entries }: { entries: LedgerEntry[] }) {
   );
 }
 
-function EntryForm({
-  companies,
-  selectedCompanyId,
-  setSelectedCompanyId,
-  codeInput,
-  setCodeInput,
-  entryDate,
-  setEntryDate,
-  count,
-  setCount,
-  signer,
-  setSigner,
-  onSuccess,
-}: {
-  companies: CompanySummary[];
-  selectedCompanyId: string | null;
-  setSelectedCompanyId: (value: string) => void;
-  codeInput: string;
-  setCodeInput: (value: string) => void;
-  entryDate: string;
-  setEntryDate: (value: string) => void;
-  count: number;
-  setCount: (value: number) => void;
-  signer: string;
-  setSigner: (value: string) => void;
-  onSuccess: () => void;
-}) {
-  const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
-  const initialState: CreateEntryState = {};
-  const [state, formAction] = useFormState(createEntry, initialState);
-  const isCodeValid = !!selectedCompany && codeInput === selectedCompany.code;
-
-  useEffect(() => {
-    if (state?.success) {
-      onSuccess();
-    }
-  }, [state?.success, onSuccess]);
-
-  return (
-    <div className={styles.card}>
-      <div>
-        <h2 className={styles.sectionTitle}>인원 등록</h2>
-        <p className={styles.sectionSubtitle}>회사 선택 후 4자리 코드를 입력하면 등록이 활성화됩니다.</p>
-      </div>
-      <form action={formAction} className={styles.formGrid}>
-        <div className={styles.fieldGroup}>
-          <label className={styles.label}>회사 선택</label>
-          <select
-            className={styles.select}
-            value={selectedCompanyId ?? ''}
-            onChange={(event) => {
-              setSelectedCompanyId(event.target.value);
-              setCodeInput('');
-            }}
-            required
-            name="companySelect"
-          >
-            <option value="" disabled>
-              회사를 선택하세요
-            </option>
-            {companies.map((company) => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className={styles.fieldGroup}>
-          <label htmlFor="code" className={styles.label}>
-            회사 코드 (4자리)
-          </label>
-          <input
-            id="code"
-            type="password"
-            inputMode="numeric"
-            maxLength={4}
-            className={styles.textInput}
-            value={codeInput}
-            onChange={(event) => setCodeInput(event.target.value.trim())}
-            placeholder="0000"
-            required
-          />
-          {selectedCompanyId && !isCodeValid ? <p className={styles.helper}>회사 코드가 일치하지 않습니다.</p> : null}
-        </div>
-
-        <div className={clsx(styles.formGridSplit)}>
-          <div className={styles.fieldGroup}>
-            <label htmlFor="entryDate" className={styles.label}>
-              날짜
-            </label>
-            <input
-              id="entryDate"
-              name="entryDate"
-              type="date"
-              className={styles.input}
-              value={entryDate}
-              onChange={(event) => setEntryDate(event.target.value)}
-              required
-            />
-          </div>
-          <div className={styles.fieldGroup}>
-            <label htmlFor="count" className={styles.label}>
-              방문 인원
-            </label>
-            <select
-              id="count"
-              name="count"
-              className={styles.select}
-              value={count}
-              onChange={(event) => setCount(Number(event.target.value))}
-              required
-            >
-              {visitorOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}명
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className={styles.fieldGroup}>
-          <label htmlFor="signer" className={styles.label}>
-            서명자 (선택)
-          </label>
-          <input
-            id="signer"
-            name="signer"
-            type="text"
-            className={styles.textInput}
-            value={signer}
-            onChange={(event) => setSigner(event.target.value)}
-            placeholder="홍길동"
-          />
-        </div>
-
-        <input type="hidden" name="companyId" value={selectedCompanyId ?? ''} />
-        <input type="hidden" name="code" value={codeInput} />
-
-        {state?.error ? <p className={styles.helper}>{state.error}</p> : null}
-        {state?.success ? <div className={styles.successNotice}>{state.success}</div> : null}
-
-        <button type="submit" className={styles.buttonPrimary} disabled={!selectedCompany || !isCodeValid}>
-          등록하기
-        </button>
-      </form>
-    </div>
-  );
-}
 
 type EntryGroup = {
   date: string;
@@ -372,6 +222,8 @@ function LedgerTable({
   canProceedPayment,
   onRequestPayment,
   paymentHint,
+  selectedYear,
+  selectedMonth,
 }: {
   entries: LedgerEntry[];
   payments: PaymentSummary[];
@@ -381,6 +233,8 @@ function LedgerTable({
   canProceedPayment: boolean;
   onRequestPayment: () => void;
   paymentHint: string | null;
+  selectedYear: number;
+  selectedMonth: number;
 }) {
   const grouped = useMemo(() => groupEntries(entries), [entries]);
 
@@ -392,12 +246,6 @@ function LedgerTable({
     );
   };
 
-  const selectAll = () => {
-    const unpaidIds = entries.filter((entry) => !entry.isPaid).map((entry) => entry.id);
-    setSelectedEntryIds(unpaidIds);
-  };
-
-  const clearAll = () => setSelectedEntryIds([]);
 
   const pendingCount = selectedEntries.reduce((sum, entry) => sum + entry.count, 0);
 
@@ -411,116 +259,200 @@ function LedgerTable({
 
   return (
     <div className={clsx(CARD_CONTAINER, 'p-6 space-y-6')}>
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-4">
         <div>
           <h2 className={TYPO.sectionTitle}>장부 내역</h2>
-          <p className={TYPO.subtitle}>선택 후 결제 처리 시, 결제 완료 항목은 회색과 취소선으로 표시됩니다.</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={selectAll}
-            className={BUTTON.secondary}
-          >
-            전체선택
-          </button>
-          <button
-            type="button"
-            onClick={clearAll}
-            className={BUTTON.secondary}
-          >
-            전체해제
-          </button>
+          <p className={TYPO.subtitle}>체크박스를 선택하여 결제 처리하세요.</p>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-3xl border border-slate-200 shadow-[0_8px_28px_-24px_rgba(15,115,88,0.45)] shadow-emerald-100">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         {grouped.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">등록된 장부가 없습니다.</p>
+          <p className="p-4 text-sm text-slate-500 text-center">등록된 장부가 없습니다.</p>
         ) : (
-          <div className="divide-y divide-slate-200">
-            {grouped.map((group) => (
-              <div key={group.date} className="bg-white">
-                <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-600">
-                  <span aria-hidden>📅</span>
-                  {format(parseISO(group.date), 'yyyy년 M월 d일 (EEE)', { locale: ko })}
-                </div>
-                <ul className="divide-y divide-slate-100">
-                  {group.entries.map((entry) => {
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50">
+                  <th className="w-8 px-2 py-2">
+                    <input
+                      type="checkbox"
+                      checked={entries.filter(e => !e.isPaid).length > 0 && entries.filter(e => !e.isPaid).every(e => selectedEntryIds.includes(e.id))}
+                      onChange={() => {
+                        const unpaidIds = entries.filter(e => !e.isPaid).map(e => e.id);
+                        const allSelected = unpaidIds.every(id => selectedEntryIds.includes(id));
+                        setSelectedEntryIds(allSelected ? [] : unpaidIds);
+                      }}
+                      className="h-4 w-4"
+                    />
+                  </th>
+                  <th className="px-3 py-2 text-left font-medium text-slate-700">날짜</th>
+                  <th className="px-3 py-2 text-left font-medium text-slate-700">회사명</th>
+                  <th className="px-3 py-2 text-center font-medium text-slate-700">인원수</th>
+                  <th className="px-3 py-2 text-left font-medium text-slate-700">서명자</th>
+                  <th className="px-3 py-2 text-center font-medium text-slate-700">결제여부</th>
+                  <th className="px-3 py-2 text-center font-medium text-slate-700">영수증</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {/* 전월 미결제 건이 있다면 상단에 표시 */}
+                {(() => {
+                  const currentMonth = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}`;
+                  const prevMonthEntries = entries.filter(e =>
+                    !e.isPaid && !e.entryDate.startsWith(currentMonth)
+                  );
+                  const prevMonthCount = prevMonthEntries.reduce((sum, e) => sum + e.count, 0);
+
+                  if (prevMonthCount > 0) {
+                    return (
+                      <tr className="bg-amber-50 border-amber-200">
+                        <td className="px-2 py-2">
+                          <input
+                            type="checkbox"
+                            checked={prevMonthEntries.every(e => selectedEntryIds.includes(e.id))}
+                            onChange={() => {
+                              const prevMonthIds = prevMonthEntries.map(e => e.id);
+                              const allSelected = prevMonthIds.every(id => selectedEntryIds.includes(id));
+                              if (allSelected) {
+                                setSelectedEntryIds(selectedEntryIds.filter(id => !prevMonthIds.includes(id)));
+                              } else {
+                                setSelectedEntryIds([...selectedEntryIds, ...prevMonthIds.filter(id => !selectedEntryIds.includes(id))]);
+                              }
+                            }}
+                            className="h-4 w-4"
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-amber-700 font-medium">
+                          전월 미결제
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-slate-900">{entries[0]?.companyName}</span>
+                            <span className="text-xs text-slate-500 font-mono">#{entries[0]?.companyCode}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="inline-flex items-center justify-center min-w-[2rem] rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                            {prevMonthCount}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">
+                          -
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                            <span>○</span>
+                            미결제
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="text-xs text-slate-400">-</span>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return null;
+                })()}
+
+                {entries
+                  .filter(entry => {
+                    const currentMonth = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}`;
+                    return entry.entryDate.startsWith(currentMonth);
+                  })
+                  .sort((a, b) => a.entryDate.localeCompare(b.entryDate))
+                  .map((entry) => {
                     const isSelected = selectedEntryIds.includes(entry.id);
                     const payment = entry.paymentId ? paymentLookup.get(entry.paymentId) : null;
                     return (
-                      <li
+                      <tr
                         key={entry.id}
                         className={clsx(
-                          'flex items-start gap-4 px-4 py-4 transition border-l-4 border-transparent',
+                          'hover:bg-slate-50 transition-colors',
                           {
-                            'border-emerald-500 bg-emerald-50/80': isSelected && !entry.isPaid,
-                            'opacity-70': entry.isPaid,
+                            'bg-emerald-50': isSelected && !entry.isPaid,
+                            'opacity-60': entry.isPaid,
                           },
                         )}
                       >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleEntry(entry.id)}
-                          disabled={entry.isPaid}
-                          className="mt-1 h-4 w-4"
-                        />
-                        <div className="flex flex-1 flex-col gap-2">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="flex flex-col gap-2">
-                              <div className="flex flex-wrap items-center gap-3">
-                                <span
-                                  aria-hidden
-                                  className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-sm text-emerald-600"
-                                >
-                                  🏢
-                                </span>
-                                <span className="font-medium text-slate-900">{entry.companyName}</span>
-                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                                  <span aria-hidden>👥</span>
-                                  {entry.count}명
-                                </span>
-                                {entry.isPaid ? (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                                    <span aria-hidden>✔</span>
-                                    결제완료
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                                    <span aria-hidden>⏳</span>
-                                    미결제
-                                  </span>
-                                )}
-                              </div>
-                              {entry.signer ? (
-                                <p className="flex items-center gap-1 text-xs text-slate-500">
-                                  <span aria-hidden>✍️</span>
-                                  서명자 {entry.signer}
-                                </p>
-                              ) : null}
-                            </div>
-                            {entry.isPaid && payment ? (
-                              <div className="flex flex-col items-end gap-1 text-xs text-slate-500">
-                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
-                                  <span aria-hidden>🧾</span>
-                                  영수증
-                                </span>
-                                <span>{format(parseISO(payment.paidAt ?? payment.toDate), 'M/d')} 결제</span>
-                              </div>
-                            ) : null}
+                        <td className="px-2 py-2">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleEntry(entry.id)}
+                            disabled={entry.isPaid}
+                            className="h-4 w-4"
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-slate-900 font-medium">
+                          {format(parseISO(entry.entryDate), 'M/d (EEE)', { locale: ko })}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-slate-900">{entry.companyName}</span>
+                            <span className="text-xs text-slate-500 font-mono">#{entry.companyCode}</span>
                           </div>
-                        </div>
-                      </li>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="inline-flex items-center justify-center min-w-[2rem] rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                            {entry.count}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">
+                          {entry.signer || '-'}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {entry.isPaid ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                              <span>✓</span>
+                              완료
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                              <span>○</span>
+                              미결제
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {entry.isPaid && payment ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+                              <span>🧾</span>
+                              있음
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400">-</span>
+                          )}
+                        </td>
+                      </tr>
                     );
                   })}
-                </ul>
-              </div>
-            ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
+
+      {/* 선택된 회사의 요약 정보 */}
+      {entries.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+          <div className="text-center">
+            <p className="text-xs text-slate-500">이번 달 총 인원</p>
+            <p className="text-lg font-semibold text-slate-900">{entries.reduce((sum, e) => sum + e.count, 0)}명</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs text-slate-500">미결제 인원</p>
+            <p className="text-lg font-semibold text-amber-600">{entries.filter(e => !e.isPaid).reduce((sum, e) => sum + e.count, 0)}명</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs text-slate-500">미결제 금액</p>
+            <p className="text-lg font-semibold text-amber-600">{(entries.filter(e => !e.isPaid).reduce((sum, e) => sum + e.count, 0) * 8000).toLocaleString()}원</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xs text-slate-500">총 방문 횟수</p>
+            <p className="text-lg font-semibold text-slate-900">{entries.length}건</p>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/60 p-4 text-sm text-emerald-900 md:flex-row md:items-center md:justify-between">
         <div>
@@ -739,107 +671,192 @@ function PaymentHistory({ payments, companies }: { payments: PaymentSummary[]; c
   );
 }
 
-function CompanySidebar({
+function LeftPanel({
   companies,
-  entries,
   selectedCompanyId,
   setSelectedCompanyId,
+  codeInput,
+  setCodeInput,
+  entryDate,
+  setEntryDate,
+  count,
+  setCount,
+  signer,
+  setSigner,
+  onSuccess,
 }: {
   companies: CompanySummary[];
-  entries: LedgerEntry[];
   selectedCompanyId: string | null;
   setSelectedCompanyId: (value: string) => void;
+  codeInput: string;
+  setCodeInput: (value: string) => void;
+  entryDate: string;
+  setEntryDate: (value: string) => void;
+  count: number;
+  setCount: (value: number) => void;
+  signer: string;
+  setSigner: (value: string) => void;
+  onSuccess: () => void;
 }) {
-  const [search, setSearch] = useState('');
+  const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
+  const initialState: CreateEntryState = {};
+  const [state, formAction] = useFormState(createEntry, initialState);
+  const isCodeValid = !!selectedCompany && codeInput === selectedCompany.code;
 
-  const stats = useMemo(() => {
-    const map = new Map<string, { visits: number; count: number }>();
-    for (const entry of entries) {
-      const current = map.get(entry.companyId) ?? { visits: 0, count: 0 };
-      current.visits += 1;
-      current.count += entry.count;
-      map.set(entry.companyId, current);
+  useEffect(() => {
+    if (state?.success) {
+      onSuccess();
     }
-    return map;
-  }, [entries]);
-
-  const filteredCompanies = useMemo(() => {
-    if (!search.trim()) {
-      return companies;
-    }
-    const lower = search.trim().toLowerCase();
-    return companies.filter((company) => company.name.toLowerCase().includes(lower));
-  }, [companies, search]);
+  }, [state?.success, onSuccess]);
 
   return (
-    <aside className={clsx(CARD_CONTAINER, 'p-6 space-y-5')}>
-      <div className="flex items-center justify-between">
-        <h2 className={TYPO.sectionTitle}>회사 목록</h2>
-        <span className={TYPO.subtitle}>{companies.length}곳</span>
+    <div className={clsx(CARD_CONTAINER, 'p-6 space-y-6')}>
+      <div>
+        <h2 className={TYPO.sectionTitle}>회사 선택 & 인원 등록</h2>
+        <p className={TYPO.subtitle}>회사를 선택하고 4자리 코드를 입력한 후 인원을 등록하세요.</p>
       </div>
-      <input
-        type="search"
-        placeholder="회사명 검색"
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-      />
-      <ul className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
-        {filteredCompanies.map((company) => {
-          const stat = stats.get(company.id);
-          return (
-            <li key={company.id}>
-              <button
-                type="button"
-                onClick={() => setSelectedCompanyId(company.id)}
-                className={clsx(
-                  'w-full rounded-xl border px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2',
-                  selectedCompanyId === company.id
-                    ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
-                    : 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40',
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                      <span
-                        aria-hidden
-                        className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-sm text-emerald-600"
-                      >
-                        🏢
-                      </span>
-                      <span className="font-medium text-slate-900">{company.name}</span>
-                    </div>
-                    {stat ? (
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
-                          <span aria-hidden>👥</span>
-                          {stat.count.toLocaleString()}명
-                        </span>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
-                          <span aria-hidden>🗒️</span>
-                          {stat.visits}회
-                        </span>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-400">이번 달 등록 없음</p>
-                    )}
-                  </div>
-                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 font-mono">
-                    #{company.code}
-                  </span>
-                </div>
-              </button>
-            </li>
-          );
-        })}
-        {filteredCompanies.length === 0 ? (
-          <li className="rounded-xl border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-500">
-            검색 결과가 없습니다.
-          </li>
+
+      <form action={formAction} className="space-y-4">
+        {/* 회사 선택 */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-slate-700">회사 선택</label>
+          <select
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            value={selectedCompanyId ?? ''}
+            onChange={(event) => {
+              setSelectedCompanyId(event.target.value);
+              setCodeInput('');
+            }}
+            required
+            name="companySelect"
+          >
+            <option value="" disabled>
+              회사를 선택하세요
+            </option>
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name} (#{company.code})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* 회사 코드 */}
+        <div className="space-y-2">
+          <label htmlFor="code" className="text-sm font-medium text-slate-700">
+            회사 코드 (4자리)
+          </label>
+          <input
+            id="code"
+            type="password"
+            inputMode="numeric"
+            maxLength={4}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            value={codeInput}
+            onChange={(event) => setCodeInput(event.target.value.trim())}
+            placeholder="0000"
+            required
+            disabled={!selectedCompanyId}
+          />
+          {selectedCompanyId && !isCodeValid && codeInput.length === 4 ? (
+            <p className="text-sm text-rose-600">회사 코드가 일치하지 않습니다.</p>
+          ) : null}
+        </div>
+
+        {/* 구분선 */}
+        <div className="border-t border-slate-200 pt-4">
+          <h3 className="text-sm font-medium text-slate-700 mb-3">방문 정보 입력</h3>
+        </div>
+
+        {/* 날짜 */}
+        <div className="space-y-2">
+          <label htmlFor="entryDate" className="text-sm font-medium text-slate-700">
+            방문 날짜
+          </label>
+          <input
+            id="entryDate"
+            name="entryDate"
+            type="date"
+            className={clsx(
+              "w-full rounded-lg border px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200",
+              !isCodeValid ? "border-slate-200 bg-slate-100 text-slate-400" : "border-slate-300"
+            )}
+            value={entryDate}
+            onChange={(event) => setEntryDate(event.target.value)}
+            disabled={!isCodeValid}
+            required
+          />
+        </div>
+
+        {/* 인원 수 */}
+        <div className="space-y-2">
+          <label htmlFor="count" className="text-sm font-medium text-slate-700">
+            방문 인원
+          </label>
+          <select
+            id="count"
+            name="count"
+            className={clsx(
+              "w-full rounded-lg border px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200",
+              !isCodeValid ? "border-slate-200 bg-slate-100 text-slate-400" : "border-slate-300"
+            )}
+            value={count}
+            onChange={(event) => setCount(Number(event.target.value))}
+            disabled={!isCodeValid}
+            required
+          >
+            {visitorOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}명
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* 서명자 */}
+        <div className="space-y-2">
+          <label htmlFor="signer" className="text-sm font-medium text-slate-700">
+            서명자 (선택)
+          </label>
+          <input
+            id="signer"
+            name="signer"
+            type="text"
+            className={clsx(
+              "w-full rounded-lg border px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200",
+              !isCodeValid ? "border-slate-200 bg-slate-100 text-slate-400" : "border-slate-300"
+            )}
+            value={signer}
+            onChange={(event) => setSigner(event.target.value)}
+            placeholder="홍길동"
+            disabled={!isCodeValid}
+          />
+        </div>
+
+        <input type="hidden" name="companyId" value={selectedCompanyId ?? ''} />
+        <input type="hidden" name="code" value={codeInput} />
+
+        {state?.error ? <p className="text-sm text-rose-600">{state.error}</p> : null}
+        {state?.success ? (
+          <div className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            {state.success}
+          </div>
         ) : null}
-      </ul>
-    </aside>
+
+        <button
+          type="submit"
+          className={clsx(
+            "w-full rounded-lg px-4 py-2 text-sm font-medium transition",
+            isCodeValid
+              ? "bg-emerald-600 text-white hover:bg-emerald-700"
+              : "bg-slate-300 text-slate-500 cursor-not-allowed"
+          )}
+          disabled={!isCodeValid}
+        >
+          등록하기
+        </button>
+      </form>
+    </div>
   );
 }
 
@@ -929,7 +946,7 @@ function PaymentModal({ open, onClose, entryIds, entries, onSuccess }: PaymentMo
           {fetchError ? (
             <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-600">{fetchError}</p>
           ) : null}
-          <div className={clsx(CARD_SUBTLE, 'px-4 py-3 text-sm text-slate-600 border-dashed border-slate-200')}>
+          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
             <p>선택된 장부 {entries.length}건 / 총 {totalCount}명</p>
             <ul className="mt-2 space-y-1 text-xs">
               {entries.map((entry) => (
@@ -1042,8 +1059,16 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    setSelectedEntryIds([]);
-  }, [selectedYear, selectedMonth]);
+    // 월이 변경될 때 선택된 회사의 미결제 항목을 전체 선택
+    if (selectedCompanyId) {
+      const unpaidIds = entries
+        .filter((entry) => !entry.isPaid && entry.companyId === selectedCompanyId)
+        .map((entry) => entry.id);
+      setSelectedEntryIds(unpaidIds);
+    } else {
+      setSelectedEntryIds([]);
+    }
+  }, [selectedYear, selectedMonth, entries, selectedCompanyId]);
 
   useEffect(() => {
     setCodeInput('');
@@ -1092,68 +1117,111 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
 
   return (
     <>
-      <div className="grid gap-6 lg:grid-cols-[320px_1fr] xl:grid-cols-[360px_1fr]">
-        <CompanySidebar
+      {/* 상단 헤더 */}
+      <div className={clsx(CARD_CONTAINER, 'flex flex-col gap-4 px-6 py-7 md:flex-row md:items-center md:justify-between mb-6')}>
+        <div className="flex items-center gap-4">
+          <MonthSelector year={selectedYear} month={selectedMonth} />
+        </div>
+        <div className="text-center">
+          <h1 className={TYPO.pageTitle}>온기한식뷔페 회사별 장부 시스템</h1>
+          <p className={TYPO.subtitle}>
+            {selectedYear}년 {selectedMonth}월 기준. {session.name ?? '사용자'}님 안녕하세요!
+          </p>
+        </div>
+        <div></div>
+      </div>
+
+      {paymentMessage ? (
+        <div className="rounded-3xl border border-emerald-100 bg-emerald-50/70 px-6 py-4 text-sm text-emerald-900 shadow-[0_10px_24px_-20px_rgba(15,115,88,0.45)] shadow-emerald-200 mb-6">
+          <div className="flex items-start gap-3">
+            <span
+              aria-hidden
+              className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg text-emerald-500 shadow-sm"
+            >
+              ✅
+            </span>
+            <div className="space-y-1">
+              {paymentMessage.split('\n').map((line, index) => (
+                <p key={index}>{line}</p>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 메인 레이아웃: 왼쪽 30% + 오른쪽 70% */}
+      <div className="grid gap-6 lg:grid-cols-[35%_65%]">
+        {/* 왼쪽 패널: 회사 선택 & 인원 등록 */}
+        <LeftPanel
           companies={companies}
-          entries={entries}
           selectedCompanyId={selectedCompanyId}
           setSelectedCompanyId={setSelectedCompanyId}
+          codeInput={codeInput}
+          setCodeInput={setCodeInput}
+          entryDate={entryDate}
+          setEntryDate={setEntryDate}
+          count={count}
+          setCount={setCount}
+          signer={signer}
+          setSigner={setSigner}
+          onSuccess={handleEntrySuccess}
         />
+
+        {/* 오른쪽 패널: 장부 테이블 */}
         <div className="space-y-6">
-          <div className={clsx(CARD_CONTAINER, 'flex flex-col gap-4 px-6 py-7 md:flex-row md:items-center md:justify-between')}>
-            <div>
-              <h1 className={TYPO.pageTitle}>월별 장부</h1>
-              <p className={TYPO.subtitle}>
-                {selectedYear}년 {selectedMonth}월 기준 방문 내역. {session.name ?? '사용자'}님 안녕하세요!
-              </p>
-            </div>
-            <MonthSelector year={selectedYear} month={selectedMonth} />
-          </div>
-          {paymentMessage ? (
-            <div className="rounded-3xl border border-emerald-100 bg-emerald-50/70 px-6 py-4 text-sm text-emerald-900 shadow-[0_10px_24px_-20px_rgba(15,115,88,0.45)] shadow-emerald-200">
-              <div className="flex items-start gap-3">
-                <span
-                  aria-hidden
-                  className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg text-emerald-500 shadow-sm"
-                >
-                  ✅
-                </span>
-                <div className="space-y-1">
-                  {paymentMessage.split('\n').map((line, index) => (
-                    <p key={index}>{line}</p>
-                  ))}
+          {/* 비활성 상태 또는 장부 테이블 */}
+          {!selectedCompanyId || !codeInput || codeInput !== companies.find(c => c.id === selectedCompanyId)?.code ? (
+            <div className={clsx(CARD_CONTAINER, 'p-8 text-center space-y-4')}>
+              <div className="mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-2xl text-slate-400">
+                📋
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-medium text-slate-900">장부 영역</h3>
+                <p className="text-sm text-slate-500 max-w-md mx-auto">
+                  왼쪽에서 회사를 선택하고 올바른 4자리 코드를 입력하면<br />
+                  이곳에 해당 회사의 월별 방문 기록이 표시됩니다.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto text-xs text-slate-400">
+                <div className="flex items-center gap-2">
+                  <span>📅</span>
+                  <span>날짜별 정리</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>👥</span>
+                  <span>인원 수 관리</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>✅</span>
+                  <span>다중 선택</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>💳</span>
+                  <span>결제 처리</span>
                 </div>
               </div>
             </div>
-          ) : null}
-          <SummaryCards entries={entries} />
-          <EntryForm
-            companies={companies}
-            selectedCompanyId={selectedCompanyId}
-            setSelectedCompanyId={setSelectedCompanyId}
-            codeInput={codeInput}
-            setCodeInput={setCodeInput}
-            entryDate={entryDate}
-            setEntryDate={setEntryDate}
-            count={count}
-            setCount={setCount}
-            signer={signer}
-            setSigner={setSigner}
-            onSuccess={handleEntrySuccess}
-          />
-          <LedgerTable
-            entries={entries}
-            payments={payments}
-            selectedEntryIds={selectedEntryIds}
-            setSelectedEntryIds={setSelectedEntryIds}
-            selectedEntries={selectedEntries}
-            canProceedPayment={canProceedPayment}
-            onRequestPayment={() => setIsPaymentOpen(true)}
-            paymentHint={paymentHint}
-          />
-          <PaymentHistory payments={payments} companies={companies} />
-          <CounterAuditLog />
+          ) : (
+            <LedgerTable
+              entries={entries.filter(entry => entry.companyId === selectedCompanyId)}
+              payments={payments}
+              selectedEntryIds={selectedEntryIds}
+              setSelectedEntryIds={setSelectedEntryIds}
+              selectedEntries={selectedEntries}
+              canProceedPayment={canProceedPayment}
+              onRequestPayment={() => setIsPaymentOpen(true)}
+              paymentHint={paymentHint}
+              selectedYear={selectedYear}
+              selectedMonth={selectedMonth}
+            />
+          )}
         </div>
+      </div>
+
+      {/* 하단 섹션들 */}
+      <div className="mt-8 space-y-6">
+        <PaymentHistory payments={payments} companies={companies} />
+        <CounterAuditLog />
       </div>
 
       <PaymentModal

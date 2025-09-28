@@ -170,7 +170,7 @@ export async function completePayment(_: CompletePaymentState, formData: FormDat
     .insert({
       company_id: companyId,
       from_date: expectedFromDate,
-      to_date,
+      to_date: toDate,
       total_count: totalCount,
       unit_price: unitPrice,
       paid_by: session.sub,
