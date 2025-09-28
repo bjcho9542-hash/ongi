@@ -8,13 +8,14 @@ import clsx from 'clsx';
 import { useFormState, useFormStatus } from 'react-dom';
 
 import { useSession } from '@/components/providers/session-provider';
-import { createEntry, type CreateEntryState } from '@/app/(protected)/entry-actions';
+import { createEntry, type CreateEntryState } from '@/app/(protected)/counter/entry-actions';
 import {
   preparePayment,
   completePayment,
+  getReceiptSignedUrl,
   type CompletePaymentState,
   type PaymentPreparationResult,
-} from '@/app/(protected)/payment-actions';
+} from '@/app/(protected)/counter/payment-actions';
 
 export type CompanySummary = {
   id: string;
@@ -59,6 +60,30 @@ type CounterDashboardProps = {
 };
 
 const visitorOptions = Array.from({ length: 20 }, (_, index) => index + 1);
+const CARD_CONTAINER = 'rounded-3xl border border-emerald-50 bg-white shadow-[0_12px_35px_-18px_rgba(15,115,88,0.35)] shadow-emerald-100';
+const CARD_SUBTLE = 'rounded-3xl border border-emerald-50 bg-emerald-50/40';
+
+const ICON_ACCENT: Record<'emerald' | 'amber' | 'sky' | 'violet', string> = {
+  emerald: 'bg-emerald-50 text-emerald-600',
+  amber: 'bg-amber-50 text-amber-600',
+  sky: 'bg-sky-50 text-sky-600',
+  violet: 'bg-violet-50 text-violet-600',
+};
+
+const TYPO = {
+  pageTitle: 'text-2xl font-semibold text-slate-900 tracking-tight',
+  sectionTitle: 'text-lg font-semibold text-slate-900 tracking-tight',
+  subtitle: 'text-sm text-slate-500 leading-relaxed',
+  helper: 'text-xs text-slate-500',
+  metric: 'text-2xl font-semibold text-slate-900',
+};
+
+const BUTTON = {
+  primary:
+    'inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-300',
+  secondary:
+    'inline-flex items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400',
+};
 
 function MonthSelector({
   year,
@@ -91,7 +116,7 @@ function MonthSelector({
   return (
     <div className="flex items-center gap-3">
       <select
-        className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+        className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
         value={yearValue}
         onChange={(event) => {
           const nextYear = Number(event.target.value);
@@ -106,7 +131,7 @@ function MonthSelector({
         ))}
       </select>
       <select
-        className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+        className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
         value={monthValue}
         onChange={(event) => {
           const nextMonth = Number(event.target.value);
@@ -133,18 +158,28 @@ function SummaryCards({ entries }: { entries: LedgerEntry[] }) {
   const uniqueCompanies = new Set(entries.map((entry) => entry.companyId)).size;
 
   const summaries = [
-    { label: '총 방문 인원', value: `${totalVisitors.toLocaleString()}명` },
-    { label: '미결제 인원', value: `${unpaidVisitors.toLocaleString()}명` },
-    { label: '등록 횟수', value: `${totalEntries.toLocaleString()}건` },
-    { label: '이용 기업', value: `${uniqueCompanies.toLocaleString()}곳` },
+    { label: '총 방문 인원', value: `${totalVisitors.toLocaleString()}명`, icon: '👥', tone: 'emerald' as const },
+    { label: '미결제 인원', value: `${unpaidVisitors.toLocaleString()}명`, icon: '⏳', tone: 'amber' as const },
+    { label: '등록 횟수', value: `${totalEntries.toLocaleString()}건`, icon: '🗒️', tone: 'sky' as const },
+    { label: '이용 기업', value: `${uniqueCompanies.toLocaleString()}곳`, icon: '🏢', tone: 'violet' as const },
   ];
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {summaries.map((item) => (
-        <div key={item.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-slate-500">{item.label}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">{item.value}</p>
+        <div key={item.label} className={clsx(CARD_CONTAINER, 'p-5')}>
+          <div className="flex items-center gap-3">
+            <span
+              aria-hidden
+              className={clsx('flex h-10 w-10 items-center justify-center rounded-full text-lg', ICON_ACCENT[item.tone])}
+            >
+              {item.icon}
+            </span>
+            <div>
+              <p className={TYPO.subtitle}>{item.label}</p>
+              <p className={clsx('mt-1', TYPO.metric)}>{item.value}</p>
+            </div>
+          </div>
         </div>
       ))}
     </div>
@@ -190,14 +225,16 @@ function EntryForm({
   }, [state?.success, onSuccess]);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">인원 등록</h2>
-      <p className="mt-1 text-sm text-slate-500">회사 선택 후 4자리 코드를 입력하면 등록이 활성화됩니다.</p>
-      <form action={formAction} className="mt-6 space-y-5">
+    <div className={clsx(CARD_CONTAINER, 'px-6 py-7 space-y-6')}>
+      <div className="space-y-1">
+        <h2 className={TYPO.sectionTitle}>인원 등록</h2>
+        <p className={TYPO.subtitle}>회사 선택 후 4자리 코드를 입력하면 등록이 활성화됩니다.</p>
+      </div>
+      <form action={formAction} className="space-y-5">
         <div className="space-y-2">
           <label className="text-sm font-medium text-slate-600">회사 선택</label>
           <select
-            className="w-full rounded-md border border-slate-300 px-3 py-2"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
             value={selectedCompanyId ?? ''}
             onChange={(event) => {
               setSelectedCompanyId(event.target.value);
@@ -226,7 +263,7 @@ function EntryForm({
             type="password"
             inputMode="numeric"
             maxLength={4}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-lg tracking-widest"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-lg tracking-widest focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
             value={codeInput}
             onChange={(event) => setCodeInput(event.target.value.trim())}
             placeholder="0000"
@@ -246,7 +283,7 @@ function EntryForm({
               id="entryDate"
               name="entryDate"
               type="date"
-              className="w-full rounded-md border border-slate-300 px-3 py-2"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
               value={entryDate}
               onChange={(event) => setEntryDate(event.target.value)}
               required
@@ -259,7 +296,7 @@ function EntryForm({
             <select
               id="count"
               name="count"
-              className="w-full rounded-md border border-slate-300 px-3 py-2"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
               value={count}
               onChange={(event) => setCount(Number(event.target.value))}
               required
@@ -281,7 +318,7 @@ function EntryForm({
             id="signer"
             name="signer"
             type="text"
-            className="w-full rounded-md border border-slate-300 px-3 py-2"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
             value={signer}
             onChange={(event) => setSigner(event.target.value)}
             placeholder="홍길동"
@@ -296,7 +333,7 @@ function EntryForm({
 
         <button
           type="submit"
-          className="w-full rounded-md bg-emerald-600 py-3 text-white font-semibold transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-emerald-300"
+          className={clsx('w-full', BUTTON.primary, 'py-3')}
           disabled={!selectedCompany || !isCodeValid}
         >
           등록하기
@@ -375,38 +412,39 @@ function LedgerTable({
   }, [payments]);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div className={clsx(CARD_CONTAINER, 'p-6 space-y-6')}>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">장부 내역</h2>
-          <p className="text-sm text-slate-500">선택 후 결제 처리 시, 결제 완료 항목은 회색과 취소선으로 표시됩니다.</p>
+          <h2 className={TYPO.sectionTitle}>장부 내역</h2>
+          <p className={TYPO.subtitle}>선택 후 결제 처리 시, 결제 완료 항목은 회색과 취소선으로 표시됩니다.</p>
         </div>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={selectAll}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm hover:border-slate-400"
+            className={BUTTON.secondary}
           >
             전체선택
           </button>
           <button
             type="button"
             onClick={clearAll}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm hover:border-slate-400"
+            className={BUTTON.secondary}
           >
             전체해제
           </button>
         </div>
       </div>
 
-      <div className="mt-4 rounded-lg border border-slate-200">
+      <div className="overflow-hidden rounded-3xl border border-slate-200 shadow-[0_8px_28px_-24px_rgba(15,115,88,0.45)] shadow-emerald-100">
         {grouped.length === 0 ? (
           <p className="p-6 text-sm text-slate-500">등록된 장부가 없습니다.</p>
         ) : (
           <div className="divide-y divide-slate-200">
             {grouped.map((group) => (
               <div key={group.date} className="bg-white">
-                <div className="bg-slate-50 px-4 py-2 text-sm font-medium text-slate-600">
+                <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-600">
+                  <span aria-hidden>📅</span>
                   {format(parseISO(group.date), 'yyyy년 M월 d일 (EEE)', { locale: ko })}
                 </div>
                 <ul className="divide-y divide-slate-100">
@@ -416,35 +454,66 @@ function LedgerTable({
                     return (
                       <li
                         key={entry.id}
-                        className={clsx('flex items-center gap-4 px-4 py-3 transition', {
-                          'bg-slate-100 line-through text-slate-400': entry.isPaid,
-                          'bg-emerald-50': isSelected && !entry.isPaid,
-                        })}
+                        className={clsx(
+                          'flex items-start gap-4 px-4 py-4 transition border-l-4 border-transparent',
+                          {
+                            'border-emerald-500 bg-emerald-50/80': isSelected && !entry.isPaid,
+                            'opacity-70': entry.isPaid,
+                          },
+                        )}
                       >
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleEntry(entry.id)}
                           disabled={entry.isPaid}
-                          className="h-4 w-4"
+                          className="mt-1 h-4 w-4"
                         />
-                        <div className="flex-1">
-                          <p className="font-medium text-slate-900">
-                            {entry.companyName}{' '}
-                            <span className="text-xs text-slate-500">({entry.count}명)</span>
-                          </p>
-                          {entry.signer ? (
-                            <p className="text-sm text-slate-500">서명자: {entry.signer}</p>
-                          ) : null}
-                        </div>
-                        {entry.isPaid ? (
-                          <div className="text-right text-xs text-slate-500">
-                            <p>결제완료</p>
-                            {payment ? (
-                              <p>{format(parseISO(payment.paidAt ?? payment.toDate), 'M/d')} 결제</p>
+                        <div className="flex flex-1 flex-col gap-2">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="flex flex-col gap-2">
+                              <div className="flex flex-wrap items-center gap-3">
+                                <span
+                                  aria-hidden
+                                  className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-sm text-emerald-600"
+                                >
+                                  🏢
+                                </span>
+                                <span className="font-medium text-slate-900">{entry.companyName}</span>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                                  <span aria-hidden>👥</span>
+                                  {entry.count}명
+                                </span>
+                                {entry.isPaid ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                    <span aria-hidden>✔</span>
+                                    결제완료
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                    <span aria-hidden>⏳</span>
+                                    미결제
+                                  </span>
+                                )}
+                              </div>
+                              {entry.signer ? (
+                                <p className="flex items-center gap-1 text-xs text-slate-500">
+                                  <span aria-hidden>✍️</span>
+                                  서명자 {entry.signer}
+                                </p>
+                              ) : null}
+                            </div>
+                            {entry.isPaid && payment ? (
+                              <div className="flex flex-col items-end gap-1 text-xs text-slate-500">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
+                                  <span aria-hidden>🧾</span>
+                                  영수증
+                                </span>
+                                <span>{format(parseISO(payment.paidAt ?? payment.toDate), 'M/d')} 결제</span>
+                              </div>
                             ) : null}
                           </div>
-                        ) : null}
+                        </div>
                       </li>
                     );
                   })}
@@ -455,10 +524,10 @@ function LedgerTable({
         )}
       </div>
 
-      <div className="mt-4 flex flex-col gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/60 p-4 text-sm text-emerald-900 md:flex-row md:items-center md:justify-between">
         <div>
-          선택된 항목: <span className="font-semibold text-slate-900">{selectedEntries.length}</span>건 / 총{' '}
-          <span className="font-semibold text-slate-900">{pendingCount}</span>명
+          선택된 항목: <span className="font-semibold text-emerald-700">{selectedEntries.length}</span>건 / 총{' '}
+          <span className="font-semibold text-emerald-700">{pendingCount}</span>명
         </div>
         <div className="flex flex-col gap-2 md:flex-row md:items-center">
           {paymentHint ? <p className="text-xs text-rose-600">{paymentHint}</p> : null}
@@ -466,12 +535,208 @@ function LedgerTable({
             type="button"
             onClick={onRequestPayment}
             disabled={!canProceedPayment}
-            className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className={BUTTON.primary}
           >
             결제 진행
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+type ReceiptPreview = {
+  url: string;
+  companyName: string;
+  period: string;
+};
+
+function ReceiptModal({ preview, onClose }: { preview: ReceiptPreview; onClose: () => void }) {
+  const baseUrl = preview.url.split('?')[0]?.toLowerCase() ?? '';
+  const isPdf = baseUrl.endsWith('.pdf');
+  const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'].some((ext) => baseUrl.endsWith(ext));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-8">
+      <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+          <div>
+            <h3 className={TYPO.sectionTitle}>영수증 미리보기</h3>
+            <p className={TYPO.subtitle}>{preview.companyName} · {preview.period}</p>
+          </div>
+          <button onClick={onClose} className="text-sm text-slate-500 hover:text-slate-900">
+            닫기
+          </button>
+        </div>
+        <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+          <p className="text-sm text-slate-600">
+            링크는 10분 후 만료됩니다.{' '}
+            <a
+              href={preview.url}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-emerald-600 hover:underline"
+            >
+              새 탭에서 열기
+            </a>
+          </p>
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            {isPdf ? (
+              <iframe
+                src={preview.url}
+                title="영수증 PDF"
+                className="h-[60vh] w-full rounded-md border border-slate-200"
+              />
+            ) : isImage ? (
+              <>
+                {/* Supabase 서명 URL은 도메인이 고정되지 않아 next/image 최적화를 적용하기 어렵습니다. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={preview.url}
+                  alt="결제 영수증"
+                  className="max-h-[60vh] w-full rounded-md object-contain"
+                />
+              </>
+            ) : (
+              <p className="text-sm text-slate-600">미리보기를 지원하지 않는 형식입니다. 새 탭에서 열어주세요.</p>
+            )}
+          </div>
+        </div>
+        <div className="flex justify-end border-t border-slate-200 px-6 py-4">
+          <button type="button" onClick={onClose} className={BUTTON.secondary}>
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PaymentHistory({ payments, companies }: { payments: PaymentSummary[]; companies: CompanySummary[] }) {
+  const companyLookup = useMemo(() => {
+    const map = new Map<string, CompanySummary>();
+    for (const company of companies) {
+      map.set(company.id, company);
+    }
+    return map;
+  }, [companies]);
+
+  const [activePaymentId, setActivePaymentId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<ReceiptPreview | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const handleViewReceipt = useCallback(
+    (payment: PaymentSummary) => {
+      const company = companyLookup.get(payment.companyId);
+      const companyName = company?.name ?? '미등록 회사';
+      const period = `${payment.fromDate} ~ ${payment.toDate}`;
+
+      setError(null);
+      setActivePaymentId(payment.id);
+
+      startTransition(async () => {
+        try {
+          const { url } = await getReceiptSignedUrl(payment.id);
+          setPreview({ url, companyName, period });
+        } catch (caughtError) {
+          console.error('receipt fetch error', caughtError);
+          setError(caughtError instanceof Error ? caughtError.message : '영수증을 불러오지 못했습니다.');
+        } finally {
+          setActivePaymentId(null);
+        }
+      });
+    },
+    [companyLookup],
+  );
+
+  return (
+    <div className={clsx(CARD_CONTAINER, 'px-6 py-7 space-y-5')}>
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className={TYPO.sectionTitle}>결제 내역</h2>
+          <p className={TYPO.subtitle}>이번 달 결제 기록과 영수증을 확인할 수 있습니다.</p>
+        </div>
+      </div>
+
+      {error ? <p className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</p> : null}
+
+      <div className="overflow-hidden rounded-3xl border border-slate-100 shadow-[0_12px_32px_-26px_rgba(15,115,88,0.45)] shadow-emerald-100">
+        <table className="w-full min-w-[640px] border-collapse text-sm">
+          <thead>
+            <tr className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+              <th className="px-3 py-2">회사</th>
+              <th className="px-3 py-2">기간</th>
+              <th className="px-3 py-2 text-right">인원</th>
+              <th className="px-3 py-2 text-right">단가</th>
+              <th className="px-3 py-2 text-right">금액</th>
+              <th className="px-3 py-2">결제일</th>
+              <th className="px-3 py-2">영수증</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {payments.map((payment) => {
+              const company = companyLookup.get(payment.companyId);
+              const isLoading = pending && activePaymentId === payment.id;
+              return (
+                <tr key={payment.id}>
+                  <td className="px-3 py-3">
+                    <div className="flex items-start gap-3">
+                      <span
+                        aria-hidden
+                        className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-sm text-emerald-600"
+                      >
+                        🏢
+                      </span>
+                      <div className="flex flex-col gap-2">
+                        <span className="font-medium text-slate-900">{company?.name ?? '미등록 회사'}</span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 font-mono">
+                          #{company?.code ?? '----'}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 text-slate-500">
+                    {payment.fromDate} ~ {payment.toDate}
+                  </td>
+                  <td className="px-3 py-2 text-right text-slate-500">{payment.totalCount.toLocaleString()}명</td>
+                  <td className="px-3 py-2 text-right text-slate-500">{payment.unitPrice.toLocaleString()}원</td>
+                  <td className="px-3 py-2 text-right font-semibold text-slate-900">{payment.totalAmount.toLocaleString()}원</td>
+                  <td className="px-3 py-2 text-slate-500">
+                    {payment.paidAt ? format(new Date(payment.paidAt), 'yyyy-MM-dd') : '-'}
+                  </td>
+                  <td className="px-3 py-2">
+                    {payment.receiptUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => handleViewReceipt(payment)}
+                        disabled={isLoading}
+                        className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-emerald-600 transition hover:border-emerald-400 hover:text-emerald-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                      >
+                        <span aria-hidden className="mr-1">🧾</span>
+                        {isLoading ? '링크 생성 중...' : '영수증 보기'}
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-slate-400">
+                        <span aria-hidden>—</span> 없음
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+            {payments.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-3 py-6 text-center text-sm text-slate-500">
+                  이번 달 결제 내역이 없습니다.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+
+      {preview ? <ReceiptModal preview={preview} onClose={() => setPreview(null)} /> : null}
     </div>
   );
 }
@@ -509,19 +774,19 @@ function CompanySidebar({
   }, [companies, search]);
 
   return (
-    <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <aside className={clsx(CARD_CONTAINER, 'p-6 space-y-5')}>
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-900">회사 목록</h2>
-        <span className="text-sm text-slate-500">{companies.length}곳</span>
+        <h2 className={TYPO.sectionTitle}>회사 목록</h2>
+        <span className={TYPO.subtitle}>{companies.length}곳</span>
       </div>
       <input
         type="search"
         placeholder="회사명 검색"
-        className="mt-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
         value={search}
         onChange={(event) => setSearch(event.target.value)}
       />
-      <ul className="mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-2">
+      <ul className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
         {filteredCompanies.map((company) => {
           const stat = stats.get(company.id);
           return (
@@ -530,20 +795,48 @@ function CompanySidebar({
                 type="button"
                 onClick={() => setSelectedCompanyId(company.id)}
                 className={clsx(
-                  'w-full rounded-lg border px-3 py-3 text-left transition hover:border-emerald-400',
-                  selectedCompanyId === company.id ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white',
+                  'w-full rounded-xl border px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2',
+                  selectedCompanyId === company.id
+                    ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
+                    : 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40',
                 )}
               >
-                <p className="font-medium text-slate-900">{company.name}</p>
-                <p className="text-xs text-slate-500">
-                  {stat ? `${stat.count.toLocaleString()}명 / ${stat.visits}회` : '이번 달 등록 없음'}
-                </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        aria-hidden
+                        className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-sm text-emerald-600"
+                      >
+                        🏢
+                      </span>
+                      <span className="font-medium text-slate-900">{company.name}</span>
+                    </div>
+                    {stat ? (
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
+                          <span aria-hidden>👥</span>
+                          {stat.count.toLocaleString()}명
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
+                          <span aria-hidden>🗒️</span>
+                          {stat.visits}회
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400">이번 달 등록 없음</p>
+                    )}
+                  </div>
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 font-mono">
+                    #{company.code}
+                  </span>
+                </div>
               </button>
             </li>
           );
         })}
         {filteredCompanies.length === 0 ? (
-          <li className="rounded-lg border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-500">
+          <li className="rounded-xl border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-500">
             검색 결과가 없습니다.
           </li>
         ) : null}
@@ -558,7 +851,7 @@ function PaymentSubmitButton({ disabled }: { disabled: boolean }) {
     <button
       type="submit"
       disabled={disabled || pending}
-      className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+      className={BUTTON.primary}
     >
       {pending ? '처리 중...' : '결제 완료'}
     </button>
@@ -622,25 +915,23 @@ function PaymentModal({ open, onClose, entryIds, entries, onSuccess }: PaymentMo
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-      <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-8">
+      <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <div>
-            <h3 className="text-lg font-semibold text-slate-900">결제 처리</h3>
-            {defaults ? (
-              <p className="text-sm text-slate-500">{defaults.companyName} — {defaults.totalCount}명</p>
-            ) : null}
+            <h3 className={TYPO.sectionTitle}>결제 처리</h3>
+            {defaults ? <p className={TYPO.subtitle}>{defaults.companyName} — {defaults.totalCount}명</p> : null}
           </div>
           <button onClick={onClose} className="text-sm text-slate-500 hover:text-slate-900">
             닫기
           </button>
         </div>
 
-        <div className="max-h-[60vh] space-y-4 overflow-y-auto px-6 py-4">
+        <div className="max-h-[60vh] space-y-4 overflow-y-auto px-6 py-5">
           {fetchError ? (
             <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-600">{fetchError}</p>
           ) : null}
-          <div className="rounded-md bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          <div className={clsx(CARD_SUBTLE, 'px-4 py-3 text-sm text-slate-600 border-dashed border-slate-200')}>
             <p>선택된 장부 {entries.length}건 / 총 {totalCount}명</p>
             <ul className="mt-2 space-y-1 text-xs">
               {entries.map((entry) => (
@@ -652,7 +943,7 @@ function PaymentModal({ open, onClose, entryIds, entries, onSuccess }: PaymentMo
           </div>
         </div>
 
-        <div className="border-t border-slate-200 px-6 py-4">
+        <div className="border-t border-slate-200 px-6 py-5">
           <form action={formAction} encType="multipart/form-data" className="space-y-4">
             {entryIds.map((id) => (
               <input key={id} type="hidden" name="entryIds" value={id} />
@@ -665,7 +956,7 @@ function PaymentModal({ open, onClose, entryIds, entries, onSuccess }: PaymentMo
                   type="text"
                   value={defaults?.fromDate ?? ''}
                   readOnly
-                  className="w-full rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm"
                 />
               </div>
               <div className="space-y-2">
@@ -678,7 +969,7 @@ function PaymentModal({ open, onClose, entryIds, entries, onSuccess }: PaymentMo
                   type="date"
                   value={toDate}
                   onChange={(event) => setToDate(event.target.value)}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
                   required
                 />
               </div>
@@ -696,7 +987,7 @@ function PaymentModal({ open, onClose, entryIds, entries, onSuccess }: PaymentMo
                   min={0}
                   value={unitPrice}
                   onChange={(event) => setUnitPrice(Number(event.target.value))}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
                   required
                 />
               </div>
@@ -706,7 +997,7 @@ function PaymentModal({ open, onClose, entryIds, entries, onSuccess }: PaymentMo
                   type="text"
                   value={`${totalAmount.toLocaleString()}원`}
                   readOnly
-                  className="w-full rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-semibold"
+                  className="w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-semibold"
                 />
               </div>
             </div>
@@ -727,12 +1018,8 @@ function PaymentModal({ open, onClose, entryIds, entries, onSuccess }: PaymentMo
 
             {state?.error ? <p className="text-sm text-rose-600">{state.error}</p> : null}
 
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:border-slate-400 hover:text-slate-900"
-              >
+            <div className="flex justify-end gap-3">
+              <button type="button" onClick={onClose} className={BUTTON.secondary}>
                 취소
               </button>
               <PaymentSubmitButton disabled={cannotSubmit} />
@@ -807,7 +1094,7 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
 
   return (
     <>
-      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[320px_1fr] xl:grid-cols-[360px_1fr]">
         <CompanySidebar
           companies={companies}
           entries={entries}
@@ -815,22 +1102,30 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
           setSelectedCompanyId={setSelectedCompanyId}
         />
         <div className="space-y-6">
-          <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
+          <div className={clsx(CARD_CONTAINER, 'flex flex-col gap-4 px-6 py-7 md:flex-row md:items-center md:justify-between')}>
             <div>
-              <h1 className="text-xl font-semibold text-slate-900">월별 장부</h1>
-              <p className="text-sm text-slate-500">
+              <h1 className={TYPO.pageTitle}>월별 장부</h1>
+              <p className={TYPO.subtitle}>
                 {selectedYear}년 {selectedMonth}월 기준 방문 내역. {session.name ?? '사용자'}님 안녕하세요!
               </p>
             </div>
             <MonthSelector year={selectedYear} month={selectedMonth} />
           </div>
           {paymentMessage ? (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              {paymentMessage.split('\n').map((line, index) => (
-                <span key={index} className="block">
-                  {line}
+            <div className="rounded-3xl border border-emerald-100 bg-emerald-50/70 px-6 py-4 text-sm text-emerald-900 shadow-[0_10px_24px_-20px_rgba(15,115,88,0.45)] shadow-emerald-200">
+              <div className="flex items-start gap-3">
+                <span
+                  aria-hidden
+                  className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg text-emerald-500 shadow-sm"
+                >
+                  ✅
                 </span>
-              ))}
+                <div className="space-y-1">
+                  {paymentMessage.split('\n').map((line, index) => (
+                    <p key={index}>{line}</p>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : null}
           <SummaryCards entries={entries} />
@@ -858,6 +1153,7 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
             onRequestPayment={() => setIsPaymentOpen(true)}
             paymentHint={paymentHint}
           />
+          <PaymentHistory payments={payments} companies={companies} />
         </div>
       </div>
 

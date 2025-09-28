@@ -1,5 +1,4 @@
-[project]
-id = "fxhfjncxyheohbboapyg"
+project_id = "fxhfjncxyheohbboapyg"
 
 [api]
 port = 54321

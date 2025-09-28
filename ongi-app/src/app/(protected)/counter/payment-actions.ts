@@ -93,6 +93,10 @@ const completeSchema = z.object({
   unitPrice: z.coerce.number().int().min(0),
 });
 
+const receiptSchema = z.object({
+  paymentId: z.string().uuid('결제 정보가 올바르지 않습니다.'),
+});
+
 export type CompletePaymentState = {
   error?: string;
   success?: string;
@@ -223,10 +227,52 @@ export async function completePayment(_: CompletePaymentState, formData: FormDat
     return { error: '장부 업데이트에 실패했습니다. 관리자에게 문의해주세요.' };
   }
 
-  revalidatePath('/', 'layout');
+  revalidatePath('/counter', 'layout');
 
   return {
     success: `결제 완료 (${totalCount.toLocaleString()}명, ${unitPrice.toLocaleString()}원 단가)` +
       (receiptPath ? '\n영수증이 업로드되었습니다.' : ''),
   };
+}
+
+export async function getReceiptSignedUrl(paymentId: string): Promise<{ url: string }> {
+  const session = await getSession();
+
+  if (!session) {
+    throw new Error('세션이 만료되었습니다. 다시 로그인해주세요.');
+  }
+
+  const parsed = receiptSchema.safeParse({ paymentId });
+
+  if (!parsed.success) {
+    throw new Error('영수증 조회 요청이 올바르지 않습니다.');
+  }
+
+  const supabase = getServiceSupabaseClient();
+
+  const { data: payment, error: paymentError } = await supabase
+    .from('payment')
+    .select('id, receipt_url')
+    .eq('id', parsed.data.paymentId)
+    .maybeSingle();
+
+  if (paymentError || !payment) {
+    console.error('payment fetch error', paymentError);
+    throw new Error('결제 정보를 찾을 수 없습니다. 새로고침 후 다시 시도해주세요.');
+  }
+
+  if (!payment.receipt_url) {
+    throw new Error('첨부된 영수증이 없습니다.');
+  }
+
+  const { data: signed, error: signedError } = await supabase.storage
+    .from('receipts')
+    .createSignedUrl(payment.receipt_url, 60 * 10);
+
+  if (signedError || !signed?.signedUrl) {
+    console.error('signed url error', signedError);
+    throw new Error('영수증 링크를 생성하지 못했습니다. 관리자에게 문의해주세요.');
+  }
+
+  return { url: signed.signedUrl };
 }

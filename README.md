@@ -81,8 +81,15 @@ Tasks:
 - [x] 회사 선택 + 코드 검증 후 인원 등록 폼
 - [x] 월별 필터, 요약 카드, 멀티 선택/전체선택 동작
 - [x] 결제 준비/완료 모달 + 영수증 업로드 처리
-- [ ] 결제 후 영수증/Signed URL 조회 화면
+- [x] 결제 후 영수증/Signed URL 조회 화면
 - [ ] 카운터 전용 감사 로그 확인 기능
+
+### UI / 스타일링
+- [x] 태블릿 친화 레이아웃(사이드바 + 메인 카드) 정리
+- [x] 네이버 톤의 컬러 팔레트/배지/아이콘 적용
+- [x] 결제/영수증 모달 스타일 통일 및 알림 배너 개선
+- [ ] shadcn/ui 등 컴포넌트 라이브러리 도입 검토 및 피그마 시안 확정
+- [ ] 브랜드 가이드에 맞춘 고급 테마(폰트/아이콘 자산) 확정
 
 ### 관리자 기능
 - [x] 회사 CRUD 화면 및 기본 정보 편집
@@ -96,9 +103,8 @@ Tasks:
 - [ ] Supabase Storage 버킷 생성 및 권한 검증
 
 ## 다음 작업 예정
-- `npm run supabase -- link --project-ref fxhfjncxyheohbboapyg` (최초 1회)로 CLI와 프로젝트 연결
-- `npm run supabase -- db push --include-all` 실행해 `supabase/migrations` 전체 적용 (또는 SQL Editor에서 순서대로 실행)
-- `git push origin main` (네트워크 가능 시)으로 방금 커밋 푸시
-- Supabase `admin_user` 테이블에 PIN 설정된 계정 추가 후, 로그인/잠금 시나리오 직접 테스트
-- 카운터 화면에서 결제 내역 Signed URL 조회, 감사 로그/CSV 등 남은 TODO 진행
-
+- (인프라) `npm run supabase -- link --project-ref fxhfjncxyheohbboapyg`, `npm run supabase -- db push --include-all`
+- (보안) Supabase `admin_user` 계정 추가 및 PIN 잠금 시나리오 점검
+- (백엔드) 감사 로그 서버 로직 구현 및 카운터 감사 로그 뷰 설계
+- (프론트) CSV/리포트 다운로드, 관리자 감사 로그 UI, PIN 초기화 UI, 통합 테스트 보강
+- (디자인) shadcn/ui 도입 여부 결정, 피그마/브랜드 가이드 확정 후 고급 테마 반영

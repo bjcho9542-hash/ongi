@@ -14,8 +14,9 @@ body {
 
 body {
   min-height: 100vh;
-  background-color: #f1f5f9;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: transparent;
+  font-family: 'Inter', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #1f2937;
 }
 
 a {

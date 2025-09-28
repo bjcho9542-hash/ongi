@@ -70,7 +70,7 @@ export async function createEntry(_: CreateEntryState, formData: FormData): Prom
     return { error: '등록 중 문제가 발생했습니다. 관리자에게 문의해주세요.' };
   }
 
-  revalidatePath('/', 'layout');
+  revalidatePath('/counter', 'layout');
 
   return { success: '입력되었습니다.' };
 }
