@@ -28,7 +28,7 @@ type LoginUserOption = {
 
 export function LoginForm({ users }: { users: LoginUserOption[] }) {
   const initialState: LoginState = {};
-  const [state, formAction] = useFormState(login, initialState);
+  const [state, formAction] = useFormState(login as any, initialState);
   const inputRef = useRef<HTMLInputElement>(null);
   const [selectedUserId, setSelectedUserId] = useState(() => users[0]?.id ?? '');
 
@@ -76,7 +76,7 @@ export function LoginForm({ users }: { users: LoginUserOption[] }) {
             const locked = user.lockedUntil && new Date(user.lockedUntil) > new Date();
             const label = `${user.name ?? '이름 미지정'} (${user.role === 'admin' ? '관리자' : '카운터'})${locked ? ' — 잠금 중' : ''}`;
             return (
-              <option key={user.id} value={user.id} disabled={locked}>
+              <option key={user.id} value={user.id} disabled={!!locked}>
                 {label}
               </option>
             );

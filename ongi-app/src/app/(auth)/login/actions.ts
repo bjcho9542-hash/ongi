@@ -6,6 +6,7 @@ import { compare } from 'bcryptjs';
 
 import { createSession } from '@/lib/auth/session';
 import { getServiceSupabaseClient } from '@/lib/supabase/service-client';
+import type { Database } from '@/types/supabase';
 
 const loginSchema = z.object({
   userId: z.string().uuid('사용자를 선택해주세요.'),
@@ -55,38 +56,38 @@ export async function login(_: LoginState, formData: FormData): Promise<LoginSta
   }
 
   const now = new Date();
-  const lockedUntil = user.locked_until ? new Date(user.locked_until) : null;
+  const lockedUntil = (user as any).locked_until ? new Date((user as any).locked_until) : null;
 
   if (lockedUntil && lockedUntil > now) {
     return { error: formatLockMessage(lockedUntil) };
   }
 
-  if (!user.password_hash) {
+  if (!(user as any).password_hash) {
     return { error: '사용자 PIN이 설정되어 있지 않습니다. 관리자에게 문의해주세요.' };
   }
 
-  const matched = await compare(pin, user.password_hash);
+  const matched = await compare(pin, (user as any).password_hash);
 
   if (matched) {
-    const { error: resetError } = await supabase
+    const { error: resetError } = await (supabase as any)
       .from('admin_user')
       .update({ failed_attempts: 0, locked_until: null })
-      .eq('id', user.id);
+      .eq('id', (user as any).id);
 
     if (resetError) {
       console.error('Failed to reset login attempts', resetError);
     }
 
     await createSession({
-      sub: user.id,
-      role: user.role === 'admin' ? 'admin' : 'counter',
-      name: user.name ?? null,
+      sub: (user as any).id,
+      role: (user as any).role === 'admin' ? 'admin' : 'counter',
+      name: (user as any).name ?? null,
     });
 
     redirect('/');
   }
 
-  const nextAttempts = (user.failed_attempts ?? 0) + 1;
+  const nextAttempts = ((user as any).failed_attempts ?? 0) + 1;
   let message = 'PIN이 올바르지 않습니다.';
   let nextLockedUntil: string | null = null;
   let attemptsToPersist = nextAttempts;
@@ -98,10 +99,10 @@ export async function login(_: LoginState, formData: FormData): Promise<LoginSta
     message = '잘못된 PIN이 3회 이상 입력되어 5분 동안 로그인할 수 없습니다.';
   }
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await (supabase as any)
     .from('admin_user')
     .update({ failed_attempts: attemptsToPersist, locked_until: nextLockedUntil })
-    .eq('id', user.id);
+    .eq('id', (user as any).id);
 
   if (updateError) {
     console.error('Failed to update login attempts', updateError);

@@ -46,7 +46,7 @@ export async function upsertCompany(_: CompanyFormState, formData: FormData): Pr
   const supabase = getServiceSupabaseClient();
 
   if (id) {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('company')
       .update({
         name,
@@ -63,11 +63,23 @@ export async function upsertCompany(_: CompanyFormState, formData: FormData): Pr
       return { error: '회사 정보를 수정하지 못했습니다.' };
     }
 
+    // Log the company update
+    try {
+      const { logAction } = await import('@/app/(protected)/actions/audit-log-actions');
+      await logAction(
+        'company_updated',
+        `회사 정보 수정: ${name} (${code})`,
+        { company_id: id, name, code }
+      );
+    } catch (logError) {
+      console.error('Failed to log company update:', logError);
+    }
+
     revalidatePath('/admin');
     return { success: '회사 정보가 수정되었습니다.' };
   }
 
-  const { error } = await supabase.from('company').insert({
+  const { error } = await (supabase as any).from('company').insert({
     name,
     code,
     contact_name: contactName ?? null,
@@ -79,6 +91,18 @@ export async function upsertCompany(_: CompanyFormState, formData: FormData): Pr
   if (error) {
     console.error('company insert error', error);
     return { error: error.code === '23505' ? '이미 사용 중인 회사 코드입니다.' : '회사 등록에 실패했습니다.' };
+  }
+
+  // Log the company creation
+  try {
+    const { logAction } = await import('@/app/(protected)/actions/audit-log-actions');
+    await logAction(
+      'company_created',
+      `새 회사 등록: ${name} (${code})`,
+      { name, code, contact_name: contactName, contact_phone: contactPhone }
+    );
+  } catch (logError) {
+    console.error('Failed to log company creation:', logError);
   }
 
   revalidatePath('/admin');
@@ -93,11 +117,33 @@ export async function deleteCompany(id: string): Promise<{ error?: string; succe
   }
 
   const supabase = getServiceSupabaseClient();
-  const { error } = await supabase.from('company').delete().eq('id', id);
+
+  // Get company info before deletion for logging
+  const { data: companyData } = await supabase
+    .from('company')
+    .select('name, code')
+    .eq('id', id)
+    .single();
+
+  const { error } = await (supabase as any).from('company').delete().eq('id', id);
 
   if (error) {
     console.error('company delete error', error);
     return { error: '회사 삭제에 실패했습니다.' };
+  }
+
+  // Log the company deletion
+  try {
+    const { logAction } = await import('@/app/(protected)/actions/audit-log-actions');
+    const companyName = (companyData as any)?.name ?? 'Unknown Company';
+    const companyCode = (companyData as any)?.code ?? '----';
+    await logAction(
+      'company_deleted',
+      `회사 삭제: ${companyName} (${companyCode})`,
+      { company_id: id, name: companyName, code: companyCode }
+    );
+  } catch (logError) {
+    console.error('Failed to log company deletion:', logError);
   }
 
   revalidatePath('/admin');

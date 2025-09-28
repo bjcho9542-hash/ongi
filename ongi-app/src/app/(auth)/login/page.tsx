@@ -27,10 +27,10 @@ export default async function LoginPage() {
   }
 
   const users = (userRows ?? []).map((user) => ({
-    id: user.id,
-    name: user.name,
-    role: user.role === 'admin' ? 'admin' : 'counter',
-    lockedUntil: user.locked_until,
+    id: (user as any).id,
+    name: (user as any).name,
+    role: ((user as any).role === 'admin' ? 'admin' : 'counter') as 'admin' | 'counter',
+    lockedUntil: (user as any).locked_until,
   }));
 
   return (

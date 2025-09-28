@@ -1,44 +1,65 @@
-:root {
-  color-scheme: light;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-*, *::before, *::after {
-  box-sizing: border-box;
-}
+@layer base {
+  :root {
+    color-scheme: light;
+    --brand: #03c75a;
+    --brand-dark: #02a34a;
+    --brand-soft: #e6f5ec;
+    --brand-softer: #f3fbf6;
+    --brand-outline: #c2ebd4;
+    --text-primary: #0f172a;
+    --text-secondary: #546274;
+    --text-muted: #7f8b99;
+    --surface: #ffffff;
+    --surface-muted: #fbfefd;
+    --shadow-soft: 0 16px 42px -28px rgba(3, 199, 90, 0.5);
+    --shadow-strong: 0 28px 60px -32px rgba(3, 199, 90, 0.55);
+    --radius-card: 28px;
+  }
 
-html,
-body {
-  margin: 0;
-  padding: 0;
-}
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
 
-body {
-  min-height: 100vh;
-  background-color: transparent;
-  font-family: 'Inter', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: #1f2937;
-}
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+  body {
+    min-height: 100vh;
+    background-color: transparent;
+    font-family: 'Inter', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #1f2937;
+  }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 
-input,
-select,
-textarea {
-  background-color: white;
-}
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
 
-ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+  input,
+  select,
+  textarea {
+    background-color: white;
+  }
+
+  ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
 }

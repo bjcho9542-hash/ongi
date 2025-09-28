@@ -16,6 +16,7 @@ import {
   type CompletePaymentState,
   type PaymentPreparationResult,
 } from '@/app/(protected)/counter/payment-actions';
+import styles from './counter-dashboard.module.css';
 
 export type CompanySummary = {
   id: string;
@@ -60,29 +61,17 @@ type CounterDashboardProps = {
 };
 
 const visitorOptions = Array.from({ length: 20 }, (_, index) => index + 1);
-const CARD_CONTAINER = 'rounded-3xl border border-emerald-50 bg-white shadow-[0_12px_35px_-18px_rgba(15,115,88,0.35)] shadow-emerald-100';
-const CARD_SUBTLE = 'rounded-3xl border border-emerald-50 bg-emerald-50/40';
 
-const ICON_ACCENT: Record<'emerald' | 'amber' | 'sky' | 'violet', string> = {
-  emerald: 'bg-emerald-50 text-emerald-600',
-  amber: 'bg-amber-50 text-amber-600',
-  sky: 'bg-sky-50 text-sky-600',
-  violet: 'bg-violet-50 text-violet-600',
-};
-
+// Shared CSS classes for consistency
+const CARD_CONTAINER = 'rounded-xl border border-slate-200 bg-white shadow-sm';
 const TYPO = {
-  pageTitle: 'text-2xl font-semibold text-slate-900 tracking-tight',
-  sectionTitle: 'text-lg font-semibold text-slate-900 tracking-tight',
-  subtitle: 'text-sm text-slate-500 leading-relaxed',
-  helper: 'text-xs text-slate-500',
-  metric: 'text-2xl font-semibold text-slate-900',
+  sectionTitle: 'text-lg font-semibold text-slate-900',
+  subtitle: 'text-sm text-slate-500',
+  pageTitle: 'text-xl font-semibold text-slate-900',
 };
-
 const BUTTON = {
-  primary:
-    'inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-300',
-  secondary:
-    'inline-flex items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400',
+  primary: 'rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-400',
+  secondary: 'rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400 hover:text-slate-900',
 };
 
 function MonthSelector({
@@ -158,27 +147,42 @@ function SummaryCards({ entries }: { entries: LedgerEntry[] }) {
   const uniqueCompanies = new Set(entries.map((entry) => entry.companyId)).size;
 
   const summaries = [
-    { label: '총 방문 인원', value: `${totalVisitors.toLocaleString()}명`, icon: '👥', tone: 'emerald' as const },
-    { label: '미결제 인원', value: `${unpaidVisitors.toLocaleString()}명`, icon: '⏳', tone: 'amber' as const },
-    { label: '등록 횟수', value: `${totalEntries.toLocaleString()}건`, icon: '🗒️', tone: 'sky' as const },
-    { label: '이용 기업', value: `${uniqueCompanies.toLocaleString()}곳`, icon: '🏢', tone: 'violet' as const },
+    {
+      label: '총 방문 인원',
+      value: `${totalVisitors.toLocaleString()}명`,
+      icon: '👥',
+      iconClass: styles.summaryIconEmerald,
+    },
+    {
+      label: '미결제 인원',
+      value: `${unpaidVisitors.toLocaleString()}명`,
+      icon: '⏳',
+      iconClass: styles.summaryIconAmber,
+    },
+    {
+      label: '등록 횟수',
+      value: `${totalEntries.toLocaleString()}건`,
+      icon: '🗒️',
+      iconClass: styles.summaryIconSky,
+    },
+    {
+      label: '이용 기업',
+      value: `${uniqueCompanies.toLocaleString()}곳`,
+      icon: '🏢',
+      iconClass: styles.summaryIconViolet,
+    },
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className={styles.summaryGrid}>
       {summaries.map((item) => (
-        <div key={item.label} className={clsx(CARD_CONTAINER, 'p-5')}>
-          <div className="flex items-center gap-3">
-            <span
-              aria-hidden
-              className={clsx('flex h-10 w-10 items-center justify-center rounded-full text-lg', ICON_ACCENT[item.tone])}
-            >
-              {item.icon}
-            </span>
-            <div>
-              <p className={TYPO.subtitle}>{item.label}</p>
-              <p className={clsx('mt-1', TYPO.metric)}>{item.value}</p>
-            </div>
+        <div key={item.label} className={styles.summaryCard}>
+          <span aria-hidden className={clsx(styles.summaryIcon, item.iconClass)}>
+            {item.icon}
+          </span>
+          <div className={styles.summaryText}>
+            <p className={styles.summaryLabel}>{item.label}</p>
+            <p className={styles.summaryValue}>{item.value}</p>
           </div>
         </div>
       ))}
@@ -225,16 +229,16 @@ function EntryForm({
   }, [state?.success, onSuccess]);
 
   return (
-    <div className={clsx(CARD_CONTAINER, 'px-6 py-7 space-y-6')}>
-      <div className="space-y-1">
-        <h2 className={TYPO.sectionTitle}>인원 등록</h2>
-        <p className={TYPO.subtitle}>회사 선택 후 4자리 코드를 입력하면 등록이 활성화됩니다.</p>
+    <div className={styles.card}>
+      <div>
+        <h2 className={styles.sectionTitle}>인원 등록</h2>
+        <p className={styles.sectionSubtitle}>회사 선택 후 4자리 코드를 입력하면 등록이 활성화됩니다.</p>
       </div>
-      <form action={formAction} className="space-y-5">
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-600">회사 선택</label>
+      <form action={formAction} className={styles.formGrid}>
+        <div className={styles.fieldGroup}>
+          <label className={styles.label}>회사 선택</label>
           <select
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            className={styles.select}
             value={selectedCompanyId ?? ''}
             onChange={(event) => {
               setSelectedCompanyId(event.target.value);
@@ -254,8 +258,8 @@ function EntryForm({
           </select>
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="code" className="text-sm font-medium text-slate-600">
+        <div className={styles.fieldGroup}>
+          <label htmlFor="code" className={styles.label}>
             회사 코드 (4자리)
           </label>
           <input
@@ -263,40 +267,38 @@ function EntryForm({
             type="password"
             inputMode="numeric"
             maxLength={4}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-lg tracking-widest focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            className={styles.textInput}
             value={codeInput}
             onChange={(event) => setCodeInput(event.target.value.trim())}
             placeholder="0000"
             required
           />
-          {selectedCompanyId && !isCodeValid ? (
-            <p className="text-xs text-rose-600">회사 코드가 일치하지 않습니다.</p>
-          ) : null}
+          {selectedCompanyId && !isCodeValid ? <p className={styles.helper}>회사 코드가 일치하지 않습니다.</p> : null}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <label htmlFor="entryDate" className="text-sm font-medium text-slate-600">
+        <div className={clsx(styles.formGridSplit)}>
+          <div className={styles.fieldGroup}>
+            <label htmlFor="entryDate" className={styles.label}>
               날짜
             </label>
             <input
               id="entryDate"
               name="entryDate"
               type="date"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+              className={styles.input}
               value={entryDate}
               onChange={(event) => setEntryDate(event.target.value)}
               required
             />
           </div>
-          <div className="space-y-2">
-            <label htmlFor="count" className="text-sm font-medium text-slate-600">
+          <div className={styles.fieldGroup}>
+            <label htmlFor="count" className={styles.label}>
               방문 인원
             </label>
             <select
               id="count"
               name="count"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+              className={styles.select}
               value={count}
               onChange={(event) => setCount(Number(event.target.value))}
               required
@@ -310,15 +312,15 @@ function EntryForm({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="signer" className="text-sm font-medium text-slate-600">
+        <div className={styles.fieldGroup}>
+          <label htmlFor="signer" className={styles.label}>
             서명자 (선택)
           </label>
           <input
             id="signer"
             name="signer"
             type="text"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            className={styles.textInput}
             value={signer}
             onChange={(event) => setSigner(event.target.value)}
             placeholder="홍길동"
@@ -328,14 +330,10 @@ function EntryForm({
         <input type="hidden" name="companyId" value={selectedCompanyId ?? ''} />
         <input type="hidden" name="code" value={codeInput} />
 
-        {state?.error ? <p className="text-sm text-rose-600">{state.error}</p> : null}
-        {state?.success ? <p className="text-sm text-emerald-600">{state.success}</p> : null}
+        {state?.error ? <p className={styles.helper}>{state.error}</p> : null}
+        {state?.success ? <div className={styles.successNotice}>{state.success}</div> : null}
 
-        <button
-          type="submit"
-          className={clsx('w-full', BUTTON.primary, 'py-3')}
-          disabled={!selectedCompany || !isCodeValid}
-        >
+        <button type="submit" className={styles.buttonPrimary} disabled={!selectedCompany || !isCodeValid}>
           등록하기
         </button>
       </form>
@@ -1154,6 +1152,7 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
             paymentHint={paymentHint}
           />
           <PaymentHistory payments={payments} companies={companies} />
+          <CounterAuditLog />
         </div>
       </div>
 
@@ -1165,5 +1164,93 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
         onSuccess={handlePaymentSuccess}
       />
     </>
+  );
+}
+
+function CounterAuditLog() {
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadAuditLogs = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Import audit log actions dynamically to avoid circular dependencies
+      const { getAuditLogs } = await import('@/app/(protected)/actions/audit-log-actions');
+      const result = await getAuditLogs(20);
+
+      if (result.error) {
+        setError(result.error);
+        setAuditLogs([]);
+      } else {
+        setAuditLogs(result.data ?? []);
+      }
+    } catch (err) {
+      setError('감사 로그를 불러오는데 실패했습니다.');
+      console.error('Failed to load audit logs:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAuditLogs();
+  }, []);
+
+  return (
+    <div className={clsx(CARD_CONTAINER, 'px-6 py-7 space-y-5')}>
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className={TYPO.sectionTitle}>감사 로그</h2>
+          <p className={TYPO.subtitle}>카운터에서 수행된 작업 기록을 확인할 수 있습니다.</p>
+        </div>
+        <button
+          type="button"
+          onClick={loadAuditLogs}
+          disabled={loading}
+          className="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-600 hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? '새로고침 중...' : '새로고침'}
+        </button>
+      </div>
+
+      {error ? (
+        <div className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</div>
+      ) : null}
+
+      <div className="overflow-hidden rounded-3xl border border-slate-100 shadow-[0_12px_32px_-26px_rgba(15,115,88,0.45)] shadow-emerald-100">
+        {loading ? (
+          <div className="p-6 text-center text-sm text-slate-500">감사 로그를 불러오는 중...</div>
+        ) : auditLogs.length === 0 ? (
+          <div className="p-6 text-center text-sm text-slate-500">감사 로그가 없습니다.</div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {auditLogs.map((log) => (
+              <div key={log.id} className="flex items-start gap-4 px-6 py-4">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-sm text-blue-600">
+                  📋
+                </div>
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="font-medium text-slate-900">{log.description}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        작업자: {log.user_name} · {format(new Date(log.created_at), 'yyyy-MM-dd HH:mm')}
+                      </p>
+                    </div>
+                    <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                      {log.action === 'entry_created' ? '등록' :
+                       log.action === 'payment_completed' ? '결제' :
+                       log.action}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

@@ -70,6 +70,23 @@ export async function createEntry(_: CreateEntryState, formData: FormData): Prom
     return { error: '등록 중 문제가 발생했습니다. 관리자에게 문의해주세요.' };
   }
 
+  // Log the action
+  try {
+    const { logAction } = await import('@/app/(protected)/actions/audit-log-actions');
+    await logAction(
+      'entry_created',
+      `회사 등록: ${(company as any).name} (${(company as any).code}) - ${count}명`,
+      {
+        company_id: companyId,
+        entry_date: entryDate,
+        count,
+        signer: signer || null,
+      }
+    );
+  } catch (logError) {
+    console.error('Failed to log entry creation:', logError);
+  }
+
   revalidatePath('/counter', 'layout');
 
   return { success: '입력되었습니다.' };

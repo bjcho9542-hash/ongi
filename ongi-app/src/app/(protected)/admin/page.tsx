@@ -2,6 +2,8 @@ import { format } from 'date-fns';
 import { redirect } from 'next/navigation';
 
 import { AdminCompanyManager } from '@/components/admin/admin-company-manager';
+import { AdminPinManager } from '@/components/admin/admin-pin-manager';
+import { CsvExport } from '@/components/admin/csv-export';
 import type { CompanySummary, PaymentSummary } from '@/components/counter/counter-dashboard';
 import { getSession } from '@/lib/auth/session';
 import { getServiceSupabaseClient } from '@/lib/supabase/service-client';
@@ -41,33 +43,33 @@ export default async function AdminPage() {
   ]);
 
   const companies: CompanySummary[] = (companyRes.data ?? []).map((company) => ({
-    id: company.id,
-    name: company.name,
-    code: company.code,
-    contactName: company.contact_name,
-    contactPhone: company.contact_phone,
-    businessNumber: company.business_number ?? null,
-    address: company.address ?? null,
+    id: (company as any).id,
+    name: (company as any).name,
+    code: (company as any).code,
+    contactName: (company as any).contact_name,
+    contactPhone: (company as any).contact_phone,
+    businessNumber: (company as any).business_number ?? null,
+    address: (company as any).address ?? null,
   }));
 
   const recentPayments: (PaymentSummary & { companyName: string; companyCode: string })[] = (recentPaymentRes.data ?? []).map(
     (payment) => ({
-      id: payment.id,
-      companyId: payment.company_id,
-      fromDate: payment.from_date,
-      toDate: payment.to_date,
-      totalCount: payment.total_count,
-      totalAmount: payment.total_amount,
-      unitPrice: payment.unit_price,
-      paidAt: payment.paid_at,
-      receiptUrl: payment.receipt_url,
-      companyName: payment.company?.name ?? '미등록',
-      companyCode: payment.company?.code ?? '----',
+      id: (payment as any).id,
+      companyId: (payment as any).company_id,
+      fromDate: (payment as any).from_date,
+      toDate: (payment as any).to_date,
+      totalCount: (payment as any).total_count,
+      totalAmount: (payment as any).total_amount,
+      unitPrice: (payment as any).unit_price,
+      paidAt: (payment as any).paid_at,
+      receiptUrl: (payment as any).receipt_url,
+      companyName: (payment as any).company?.name ?? '미등록',
+      companyCode: (payment as any).company?.code ?? '----',
     }),
   );
 
-  const monthlyTotal = (monthlySumRes.data ?? []).reduce((sum, row) => sum + (row.total_amount ?? 0), 0);
-  const overallTotal = (overallSumRes.data ?? []).reduce((sum, row) => sum + (row.total_amount ?? 0), 0);
+  const monthlyTotal = (monthlySumRes.data ?? []).reduce((sum, row) => sum + ((row as any).total_amount ?? 0), 0);
+  const overallTotal = (overallSumRes.data ?? []).reduce((sum, row) => sum + ((row as any).total_amount ?? 0), 0);
 
   return (
     <div className="space-y-8">
@@ -95,6 +97,10 @@ export default async function AdminPage() {
       </div>
 
       <AdminCompanyManager companies={companies} />
+
+      <AdminPinManager />
+
+      <CsvExport />
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">최근 결제 내역</h2>

@@ -227,6 +227,39 @@ export async function completePayment(_: CompletePaymentState, formData: FormDat
     return { error: '장부 업데이트에 실패했습니다. 관리자에게 문의해주세요.' };
   }
 
+  // Log the payment completion
+  try {
+    const { logAction } = await import('@/app/(protected)/actions/audit-log-actions');
+
+    // Get company info for logging
+    const { data: companyData } = await supabase
+      .from('company')
+      .select('name, code')
+      .eq('id', companyId)
+      .single();
+
+    const companyName = (companyData as any)?.name ?? 'Unknown Company';
+    const companyCode = (companyData as any)?.code ?? '----';
+    const totalAmount = totalCount * unitPrice;
+
+    await logAction(
+      'payment_completed',
+      `결제 완료: ${companyName} (${companyCode}) - ${totalAmount.toLocaleString()}원`,
+      {
+        payment_id: paymentRow.id,
+        company_id: companyId,
+        total_count: totalCount,
+        unit_price: unitPrice,
+        total_amount: totalAmount,
+        from_date: fromDate,
+        to_date: toDate,
+        has_receipt: !!receiptPath,
+      }
+    );
+  } catch (logError) {
+    console.error('Failed to log payment completion:', logError);
+  }
+
   revalidatePath('/counter', 'layout');
 
   return {
