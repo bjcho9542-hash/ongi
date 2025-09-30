@@ -1,10 +1,10 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { env } from '@/env';
 import type { Database } from '@/types/supabase';
 
-let cachedClient: SupabaseClient<Database> | null = null;
+let cachedClient: ReturnType<typeof createClient<Database>> | null = null;
 
-export function getServiceSupabaseClient(): SupabaseClient<Database> {
+export function getServiceSupabaseClient() {
   if (cachedClient) {
     return cachedClient;
   }

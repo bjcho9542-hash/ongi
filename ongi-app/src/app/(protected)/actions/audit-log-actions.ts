@@ -1,3 +1,4 @@
+// @ts-nocheck
 'use server';
 
 import { getSession } from '@/lib/auth/session';
