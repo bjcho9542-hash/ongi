@@ -1,5 +1,15 @@
 {
-  "buildCommand": "cd ongi-app && npm install && npm run build",
-  "outputDirectory": "ongi-app/.next",
-  "installCommand": "cd ongi-app && npm install"
+  "version": 2,
+  "builds": [
+    {
+      "src": "ongi-app/package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "ongi-app/$1"
+    }
+  ]
 }
