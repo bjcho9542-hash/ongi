@@ -46,7 +46,7 @@ export async function createEntry(_: CreateEntryState, formData: FormData): Prom
     .from('company')
     .select('id, code')
     .eq('id', companyId)
-    .maybeSingle();
+    .single();
 
   if (companyError || !company) {
     console.error('회사 조회 실패', companyError);
