@@ -671,6 +671,12 @@ function PaymentHistory({ payments, companies }: { payments: PaymentSummary[]; c
   );
 }
 
+type EntrySuccessInfo = {
+  companyName: string;
+  entryDate: string;
+  count: number;
+};
+
 function LeftPanel({
   companies,
   selectedCompanyId,
@@ -696,7 +702,7 @@ function LeftPanel({
   setCount: (value: number) => void;
   signer: string;
   setSigner: (value: string) => void;
-  onSuccess: () => void;
+  onSuccess: (info: EntrySuccessInfo) => void;
 }) {
   const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
   const initialState: CreateEntryState = {};
@@ -705,9 +711,10 @@ function LeftPanel({
 
   useEffect(() => {
     if (state?.success) {
-      onSuccess();
+      const companyName = selectedCompany?.name ?? '미등록 회사';
+      onSuccess({ companyName, entryDate, count });
     }
-  }, [state?.success, onSuccess]);
+  }, [state?.success, onSuccess, selectedCompany?.name, entryDate, count]);
 
   return (
     <div className={clsx(CARD_CONTAINER, 'p-6 space-y-6')}>
@@ -1057,6 +1064,12 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
   const [selectedEntryIds, setSelectedEntryIds] = useState<string[]>([]);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
+  const [entryConfirm, setEntryConfirm] = useState<{
+    open: boolean;
+    companyName: string;
+    entryDate: string;
+    count: number;
+  } | null>(null);
 
   useEffect(() => {
     // 월이 변경될 때 선택된 회사의 미결제 항목을 전체 선택
@@ -1097,11 +1110,17 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
       ? '동일한 회사의 항목만 선택할 수 있습니다.'
       : null;
 
-  const handleEntrySuccess = () => {
+  const handleEntrySuccess = (info: EntrySuccessInfo) => {
+    setEntryConfirm({ open: true, ...info });
+  };
+
+  const handleEntryConfirmClose = useCallback(() => {
+    setEntryConfirm(null);
+    // 팝업이 닫힐 때 입력값 초기화 및 장부 닫기
     setCount(1);
     setSigner('');
     setCodeInput('');
-  };
+  }, []);
 
   const handlePaymentSuccess = useCallback((message: string) => {
     setPaymentMessage(message);
@@ -1152,20 +1171,20 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
       {/* 메인 레이아웃: 왼쪽 30% + 오른쪽 70% */}
       <div className="grid gap-6 lg:grid-cols-[35%_65%]">
         {/* 왼쪽 패널: 회사 선택 & 인원 등록 */}
-        <LeftPanel
-          companies={companies}
-          selectedCompanyId={selectedCompanyId}
-          setSelectedCompanyId={setSelectedCompanyId}
-          codeInput={codeInput}
-          setCodeInput={setCodeInput}
-          entryDate={entryDate}
-          setEntryDate={setEntryDate}
-          count={count}
-          setCount={setCount}
-          signer={signer}
-          setSigner={setSigner}
-          onSuccess={handleEntrySuccess}
-        />
+      <LeftPanel
+        companies={companies}
+        selectedCompanyId={selectedCompanyId}
+        setSelectedCompanyId={setSelectedCompanyId}
+        codeInput={codeInput}
+        setCodeInput={setCodeInput}
+        entryDate={entryDate}
+        setEntryDate={setEntryDate}
+        count={count}
+        setCount={setCount}
+        signer={signer}
+        setSigner={setSigner}
+        onSuccess={handleEntrySuccess}
+      />
 
         {/* 오른쪽 패널: 장부 테이블 */}
         <div className="space-y-6">
@@ -1231,7 +1250,58 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
         entries={selectedEntries}
         onSuccess={handlePaymentSuccess}
       />
+
+      <EntryConfirmModal
+        open={!!entryConfirm?.open}
+        companyName={entryConfirm?.companyName ?? ''}
+        entryDate={entryConfirm?.entryDate ?? ''}
+        count={entryConfirm?.count ?? 0}
+        onClose={handleEntryConfirmClose}
+      />
     </>
+  );
+}
+
+type EntryConfirmModalProps = {
+  open: boolean;
+  companyName: string;
+  entryDate: string; // yyyy-MM-dd
+  count: number;
+  onClose: () => void;
+};
+
+function EntryConfirmModal({ open, companyName, entryDate, count, onClose }: EntryConfirmModalProps) {
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => onClose(), 5000);
+    return () => clearTimeout(t);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-8">
+      <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+          <h3 className={TYPO.sectionTitle}>방문 등록 완료</h3>
+          <button onClick={onClose} className="text-sm text-slate-500 hover:text-slate-900">닫기</button>
+        </div>
+        <div className="px-6 py-6 space-y-3 text-sm text-slate-700">
+          <p>
+            <span className="font-medium">{entryDate}</span>
+            <span className="mx-2">—</span>
+            <span className="font-medium">{companyName}</span>
+            <span className="mx-2">•</span>
+            <span className="font-medium">{count}명</span>
+          </p>
+          <p>장부에 등록되었습니다.</p>
+          <p className="text-xs text-slate-400">이 창은 5초 후 자동으로 닫힙니다.</p>
+        </div>
+        <div className="border-t border-slate-200 px-6 py-4 flex justify-end">
+          <button onClick={onClose} className={BUTTON.primary}>확인</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
