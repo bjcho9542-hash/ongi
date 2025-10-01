@@ -1,5 +1,5 @@
-../.git
-../claude-context
-../mcp-servers
-../프롬프팅
-../supabase
+.git
+claude-context
+mcp-servers
+프롬프팅
+supabase
