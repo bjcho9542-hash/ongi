@@ -104,9 +104,9 @@ function MonthSelector({
   };
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2">
       <select
-        className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+        className="rounded-md border border-slate-300 px-2 py-1 text-sm focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-200"
         value={yearValue}
         onChange={(event) => {
           const nextYear = Number(event.target.value);
@@ -121,7 +121,7 @@ function MonthSelector({
         ))}
       </select>
       <select
-        className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+        className="rounded-md border border-slate-300 px-2 py-1 text-sm focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-200"
         value={monthValue}
         onChange={(event) => {
           const nextMonth = Number(event.target.value);
@@ -225,6 +225,7 @@ function LedgerTable({
   paymentHint,
   selectedYear,
   selectedMonth,
+  onOpenMonthPayments,
 }: {
   entries: LedgerEntry[];
   payments: PaymentSummary[];
@@ -236,6 +237,7 @@ function LedgerTable({
   paymentHint: string | null;
   selectedYear: number;
   selectedMonth: number;
+  onOpenMonthPayments: () => void;
 }) {
   const toggleEntry = (id: string) => {
     setSelectedEntryIds(
@@ -251,21 +253,29 @@ function LedgerTable({
   const prevMonthEntries = entries.filter(e => !e.isPaid && !e.entryDate.startsWith(currentMonth));
   const prevMonthCount = prevMonthEntries.reduce((sum, e) => sum + e.count, 0);
   const monthEntries = entries
-    .filter(e => e.entryDate.startsWith(currentMonth))
+    .filter(e => e.entryDate.startsWith(currentMonth) && !e.isPaid)
     .sort((a, b) => a.entryDate.localeCompare(b.entryDate));
-  const leftEntries = monthEntries.filter((_, idx) => idx % 2 === 0);
-  const rightEntries = monthEntries.filter((_, idx) => idx % 2 === 1);
+  // 왼쪽 컬럼에 최대 20개까지 채우고, 나머지는 오른쪽 컬럼에 배치
+  const leftEntries = monthEntries.slice(0, 20);
+  const rightEntries = monthEntries.slice(20);
 
   const allUnpaidIds = entries.filter(e => !e.isPaid).map(e => e.id);
   const allSelected = allUnpaidIds.length > 0 && allUnpaidIds.every(id => selectedEntryIds.includes(id));
 
   return (
     <div className={clsx(CARD_CONTAINER, 'p-6 space-y-6')}>
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-4">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-2">
         <div>
           <h2 className={TYPO.sectionTitle}>장부 내역</h2>
-          <p className={TYPO.subtitle}>체크박스를 선택하여 결제 처리하세요.</p>
+          <p className={TYPO.subtitle}>체크 후 우측 버튼으로 결제 진행</p>
         </div>
+        <button
+          type="button"
+          onClick={onOpenMonthPayments}
+          className="rounded-md border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:border-slate-400 hover:text-slate-900"
+        >
+          당월 결제 내역
+        </button>
       </div>
       <div className="space-y-3">
         {/* 전체 선택 */}
@@ -307,20 +317,19 @@ function LedgerTable({
         {monthEntries.length === 0 ? (
           <p className="p-4 text-sm text-slate-500 text-center">등록된 장부가 없습니다.</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[72vh] overflow-y-auto">
             {[leftEntries, rightEntries].map((list, colIdx) => (
               <div key={colIdx} className="rounded-xl border border-slate-200 bg-white">
                 <ul className="divide-y divide-slate-100">
                   {list.map((entry) => {
                     const isSelected = selectedEntryIds.includes(entry.id);
                     return (
-                      <li key={entry.id} className={clsx('flex items-center justify-between px-3 py-2 hover:bg-slate-50', { 'opacity-60': entry.isPaid })}>
+                      <li key={entry.id} className={clsx('flex items-center justify-between px-3 py-2 hover:bg-slate-50')}>
                         <div className="flex items-center gap-3">
                           <input
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleEntry(entry.id)}
-                            disabled={entry.isPaid}
                             className="h-4 w-4"
                           />
                           <span className="text-sm font-medium text-slate-900 min-w-[84px]">
@@ -331,11 +340,7 @@ function LedgerTable({
                           <span className="inline-flex items-center justify-center min-w-[2rem] rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
                             {entry.count}
                           </span>
-                          {entry.isPaid ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">완료</span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">미결제</span>
-                          )}
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">미결제</span>
                         </div>
                       </li>
                     );
@@ -793,6 +798,70 @@ function LeftPanel({
   );
 }
 
+type MonthPaymentsModalProps = {
+  open: boolean;
+  onClose: () => void;
+  payments: PaymentSummary[];
+  companies: CompanySummary[];
+};
+
+function MonthPaymentsModal({ open, onClose, payments, companies }: MonthPaymentsModalProps) {
+  const companyLookup = useMemo(() => {
+    const map = new Map<string, CompanySummary>();
+    for (const company of companies) map.set(company.id, company);
+    return map;
+  }, [companies]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-8">
+      <div className="w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+          <h3 className={TYPO.sectionTitle}>당월 결제 내역</h3>
+          <button onClick={onClose} className="text-sm text-slate-500 hover:text-slate-900">닫기</button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {payments.length === 0 ? (
+            <p className="p-4 text-sm text-slate-500 text-center">이번 달 결제 내역이 없습니다.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-2">회사</th>
+                  <th className="px-3 py-2">기간</th>
+                  <th className="px-3 py-2 text-right">인원</th>
+                  <th className="px-3 py-2 text-right">단가</th>
+                  <th className="px-3 py-2 text-right">금액</th>
+                  <th className="px-3 py-2">결제일</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {payments.map((p) => {
+                  const company = companyLookup.get(p.companyId);
+                  return (
+                    <tr key={p.id}>
+                      <td className="px-3 py-2">{company?.name ?? '미등록 회사'} <span className="text-xs text-slate-500 font-mono">#{company?.code ?? '----'}</span></td>
+                      <td className="px-3 py-2 text-slate-500">{p.fromDate} ~ {p.toDate}</td>
+                      <td className="px-3 py-2 text-right text-slate-500">{p.totalCount.toLocaleString()}명</td>
+                      <td className="px-3 py-2 text-right text-slate-500">{p.unitPrice.toLocaleString()}원</td>
+                      <td className="px-3 py-2 text-right font-semibold text-slate-900">{p.totalAmount.toLocaleString()}원</td>
+                      <td className="px-3 py-2 text-slate-500">{p.paidAt ? format(new Date(p.paidAt), 'yyyy-MM-dd') : '-'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="border-t border-slate-200 px-5 py-3 text-right">
+          <button onClick={onClose} className={BUTTON.secondary}>닫기</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EntrySubmitButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
   return (
@@ -1006,6 +1075,7 @@ export function CounterDashboard({ companies, entries, prevUnpaidEntries, paymen
   const [selectedEntryIds, setSelectedEntryIds] = useState<string[]>([]);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
+  const [isMonthPaymentsOpen, setIsMonthPaymentsOpen] = useState(false);
   const [entryConfirm, setEntryConfirm] = useState<{
     open: boolean;
     companyName: string;
@@ -1080,7 +1150,7 @@ export function CounterDashboard({ companies, entries, prevUnpaidEntries, paymen
   return (
     <>
       {/* 상단 헤더 */}
-      <div className={clsx(CARD_CONTAINER, 'flex flex-col gap-4 px-6 py-7 md:flex-row md:items-center md:justify-between mb-6')}>
+      <div className={clsx(CARD_CONTAINER, 'flex flex-col gap-2 px-4 py-4 md:flex-row md:items-center md:justify-between mb-3')}>
         <div className="flex items-center gap-4">
           <MonthSelector year={selectedYear} month={selectedMonth} />
         </div>
@@ -1188,14 +1258,14 @@ export function CounterDashboard({ companies, entries, prevUnpaidEntries, paymen
               paymentHint={paymentHint}
               selectedYear={selectedYear}
               selectedMonth={selectedMonth}
+              onOpenMonthPayments={() => setIsMonthPaymentsOpen(true)}
             />
           )}
         </div>
       </div>
 
       {/* 하단 섹션들 */}
-      <div className="mt-8 space-y-6">
-        <PaymentHistory payments={payments} companies={companies} />
+      <div className="mt-6 space-y-6">
         <CounterAuditLog />
       </div>
 
@@ -1205,6 +1275,13 @@ export function CounterDashboard({ companies, entries, prevUnpaidEntries, paymen
         entryIds={selectedEntryIdsSorted}
         entries={selectedEntries}
         onSuccess={handlePaymentSuccess}
+      />
+
+      <MonthPaymentsModal
+        open={isMonthPaymentsOpen}
+        onClose={() => setIsMonthPaymentsOpen(false)}
+        payments={payments}
+        companies={companies}
       />
     </>
   );
