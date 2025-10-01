@@ -54,7 +54,8 @@ export type PaymentSummary = {
 
 type CounterDashboardProps = {
   companies: CompanySummary[];
-  entries: LedgerEntry[];
+  entries: LedgerEntry[]; // 이번 달
+  prevUnpaidEntries: LedgerEntry[]; // 전월까지 미결제
   payments: PaymentSummary[];
   selectedYear: number;
   selectedMonth: number; // 1-12
@@ -437,7 +438,11 @@ function LedgerTable({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
           <div className="text-center">
             <p className="text-xs text-slate-500">이번 달 총 인원</p>
-            <p className="text-lg font-semibold text-slate-900">{entries.reduce((sum, e) => sum + e.count, 0)}명</p>
+            <p className="text-lg font-semibold text-slate-900">{
+              entries
+                .filter(e => e.entryDate.startsWith(`${selectedYear}-${String(selectedMonth).padStart(2,'0')}`))
+                .reduce((sum, e) => sum + e.count, 0)
+            }명</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-slate-500">미결제 인원</p>
@@ -449,7 +454,11 @@ function LedgerTable({
           </div>
           <div className="text-center">
             <p className="text-xs text-slate-500">총 방문 횟수</p>
-            <p className="text-lg font-semibold text-slate-900">{entries.length}건</p>
+            <p className="text-lg font-semibold text-slate-900">{
+              entries
+                .filter(e => e.entryDate.startsWith(`${selectedYear}-${String(selectedMonth).padStart(2,'0')}`))
+                .length
+            }건</p>
           </div>
         </div>
       )}
@@ -1055,7 +1064,7 @@ function PaymentModal({ open, onClose, entryIds, entries, onSuccess }: PaymentMo
   );
 }
 
-export function CounterDashboard({ companies, entries, payments, selectedYear, selectedMonth }: CounterDashboardProps) {
+export function CounterDashboard({ companies, entries, prevUnpaidEntries, payments, selectedYear, selectedMonth }: CounterDashboardProps) {
   const session = useSession();
   const today = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(companies[0]?.id ?? null);
@@ -1074,16 +1083,16 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
   } | null>(null);
 
   useEffect(() => {
-    // 월이 변경될 때 선택된 회사의 미결제 항목을 전체 선택
+    // 월이 변경되거나 회사가 변경될 때, 해당 회사의 미결제 항목(전월 포함)을 기본 선택
     if (selectedCompanyId) {
-      const unpaidIds = entries
+      const unpaidIds = [...entries, ...prevUnpaidEntries]
         .filter((entry) => !entry.isPaid && entry.companyId === selectedCompanyId)
         .map((entry) => entry.id);
       setSelectedEntryIds(unpaidIds);
     } else {
       setSelectedEntryIds([]);
     }
-  }, [selectedYear, selectedMonth, entries, selectedCompanyId]);
+  }, [selectedYear, selectedMonth, entries, prevUnpaidEntries, selectedCompanyId]);
 
   useEffect(() => {
     setCodeInput('');
@@ -1097,9 +1106,10 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
     return () => clearTimeout(timer);
   }, [paymentMessage]);
 
+  const allEntries = useMemo(() => [...entries, ...prevUnpaidEntries], [entries, prevUnpaidEntries]);
   const selectedEntries = useMemo(
-    () => entries.filter((entry) => selectedEntryIds.includes(entry.id)),
-    [entries, selectedEntryIds],
+    () => allEntries.filter((entry) => selectedEntryIds.includes(entry.id)),
+    [allEntries, selectedEntryIds],
   );
 
   const canProceedPayment =
@@ -1235,7 +1245,7 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
             </div>
           ) : (
             <LedgerTable
-              entries={entries.filter(entry => entry.companyId === selectedCompanyId)}
+              entries={[...entries, ...prevUnpaidEntries].filter(entry => entry.companyId === selectedCompanyId)}
               payments={payments}
               selectedEntryIds={selectedEntryIds}
               setSelectedEntryIds={setSelectedEntryIds}

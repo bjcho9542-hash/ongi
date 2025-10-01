@@ -35,7 +35,7 @@ export default async function CounterPage({
 
   const supabase = getServiceSupabaseClient();
 
-  const [{ data: companyRows }, { data: entryRows }, { data: paymentRows }] = await Promise.all([
+  const [{ data: companyRows }, { data: entryRows }, { data: paymentRows }, { data: prevUnpaidRows }] = await Promise.all([
     supabase
       .from('company')
       .select('id, name, code, contact_name, contact_phone, business_number, address')
@@ -54,6 +54,14 @@ export default async function CounterPage({
       .gte('from_date', startDate)
       .lte('to_date', endDate)
       .order('paid_at', { ascending: false }),
+    supabase
+      .from('entry')
+      .select(
+        'id, company_id, entry_date, count, signer, is_paid, payment_id, company:company(id, name, code)'
+      )
+      .lt('entry_date', startDate)
+      .is('is_paid', false)
+      .order('entry_date', { ascending: false }),
   ]);
 
   const companies: CompanySummary[] = (companyRows ?? []).map((company) => ({
@@ -67,6 +75,18 @@ export default async function CounterPage({
   }));
 
   const entries: LedgerEntry[] = (entryRows ?? []).map((entry) => ({
+    id: entry.id,
+    companyId: entry.company_id,
+    companyName: entry.company?.name ?? '미기록 회사',
+    companyCode: entry.company?.code ?? '----',
+    entryDate: entry.entry_date,
+    count: entry.count,
+    signer: entry.signer,
+    isPaid: entry.is_paid ?? false,
+    paymentId: entry.payment_id,
+  }));
+
+  const prevUnpaidEntries: LedgerEntry[] = (prevUnpaidRows ?? []).map((entry) => ({
     id: entry.id,
     companyId: entry.company_id,
     companyName: entry.company?.name ?? '미기록 회사',
@@ -94,6 +114,7 @@ export default async function CounterPage({
     <CounterDashboard
       companies={companies}
       entries={entries}
+      prevUnpaidEntries={prevUnpaidEntries}
       payments={payments}
       selectedYear={year}
       selectedMonth={month}
