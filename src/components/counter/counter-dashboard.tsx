@@ -1171,20 +1171,31 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
       {/* 메인 레이아웃: 왼쪽 30% + 오른쪽 70% */}
       <div className="grid gap-6 lg:grid-cols-[35%_65%]">
         {/* 왼쪽 패널: 회사 선택 & 인원 등록 */}
-      <LeftPanel
-        companies={companies}
-        selectedCompanyId={selectedCompanyId}
-        setSelectedCompanyId={setSelectedCompanyId}
-        codeInput={codeInput}
-        setCodeInput={setCodeInput}
-        entryDate={entryDate}
-        setEntryDate={setEntryDate}
-        count={count}
-        setCount={setCount}
-        signer={signer}
-        setSigner={setSigner}
-        onSuccess={handleEntrySuccess}
-      />
+        <div className="relative">
+          <LeftPanel
+            companies={companies}
+            selectedCompanyId={selectedCompanyId}
+            setSelectedCompanyId={setSelectedCompanyId}
+            codeInput={codeInput}
+            setCodeInput={setCodeInput}
+            entryDate={entryDate}
+            setEntryDate={setEntryDate}
+            count={count}
+            setCount={setCount}
+            signer={signer}
+            setSigner={setSigner}
+            onSuccess={handleEntrySuccess}
+          />
+
+          {/* 등록 확인 토스트 (왼쪽 패널 안쪽에 고정) */}
+          <EntryConfirmModal
+            open={!!entryConfirm?.open}
+            companyName={entryConfirm?.companyName ?? ''}
+            entryDate={entryConfirm?.entryDate ?? ''}
+            count={entryConfirm?.count ?? 0}
+            onClose={handleEntryConfirmClose}
+          />
+        </div>
 
         {/* 오른쪽 패널: 장부 테이블 */}
         <div className="space-y-6">
@@ -1250,14 +1261,6 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
         entries={selectedEntries}
         onSuccess={handlePaymentSuccess}
       />
-
-      <EntryConfirmModal
-        open={!!entryConfirm?.open}
-        companyName={entryConfirm?.companyName ?? ''}
-        entryDate={entryConfirm?.entryDate ?? ''}
-        count={entryConfirm?.count ?? 0}
-        onClose={handleEntryConfirmClose}
-      />
     </>
   );
 }
@@ -1271,22 +1274,35 @@ type EntryConfirmModalProps = {
 };
 
 function EntryConfirmModal({ open, companyName, entryDate, count, onClose }: EntryConfirmModalProps) {
+  const [remaining, setRemaining] = useState(5);
+
   useEffect(() => {
     if (!open) return;
-    const t = setTimeout(() => onClose(), 5000);
-    return () => clearTimeout(t);
+    setRemaining(5);
+    const iv = setInterval(() => {
+      setRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(iv);
+          // 안전하게 닫기
+          onClose();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(iv);
   }, [open, onClose]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-8">
-      <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+    <div className="absolute left-4 right-4 top-4 z-40">
+      <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-emerald-100 px-4 py-3">
           <h3 className={TYPO.sectionTitle}>방문 등록 완료</h3>
-          <button onClick={onClose} className="text-sm text-slate-500 hover:text-slate-900">닫기</button>
+          <button onClick={onClose} className="text-xs text-slate-500 hover:text-slate-900">닫기</button>
         </div>
-        <div className="px-6 py-6 space-y-3 text-sm text-slate-700">
+        <div className="px-4 py-4 space-y-2 text-sm text-slate-700">
           <p>
             <span className="font-medium">{entryDate}</span>
             <span className="mx-2">—</span>
@@ -1295,9 +1311,9 @@ function EntryConfirmModal({ open, companyName, entryDate, count, onClose }: Ent
             <span className="font-medium">{count}명</span>
           </p>
           <p>장부에 등록되었습니다.</p>
-          <p className="text-xs text-slate-400">이 창은 5초 후 자동으로 닫힙니다.</p>
+          <p className="text-xs text-slate-400">{remaining}초 후 자동으로 닫힙니다.</p>
         </div>
-        <div className="border-t border-slate-200 px-6 py-4 flex justify-end">
+        <div className="border-t border-emerald-100 px-4 py-3 flex justify-end">
           <button onClick={onClose} className={BUTTON.primary}>확인</button>
         </div>
       </div>
