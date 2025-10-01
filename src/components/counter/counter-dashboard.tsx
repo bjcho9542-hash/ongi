@@ -826,6 +826,21 @@ function MonthPaymentsModal({ open, onClose, payments, companies, companyId, ent
     const pay = e.paymentId ? paymentLookup.get(e.paymentId) : null;
     return sum + (pay ? e.count * pay.unitPrice : 0);
   }, 0);
+  const paidDates = paidEntries
+    .map(e => (e.paymentId ? paymentLookup.get(e.paymentId)?.paidAt ?? null : null))
+    .filter(Boolean) as string[];
+  const paidRange = paidDates.length
+    ? (() => {
+        const sorted = paidDates.slice().sort();
+        const first = format(new Date(sorted[0]!), 'yyyy-MM-dd');
+        const last = format(new Date(sorted[sorted.length - 1]!), 'yyyy-MM-dd');
+        return first === last ? first : `${first} ~ ${last}`;
+      })()
+    : '-';
+
+  // 장부 내역과 동일한 2단 분할: 왼쪽에 20개까지, 나머지는 오른쪽
+  const leftEntries = paidEntries.slice(0, 20);
+  const rightEntries = paidEntries.slice(20);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-8">
@@ -843,51 +858,51 @@ function MonthPaymentsModal({ open, onClose, payments, companies, companyId, ent
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 cursor-default">
           {/* 상단 합계 한 줄 */}
-          <div className="mb-3 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-            <span className="text-slate-700">합계</span>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+            <div className="text-slate-700">합계</div>
             <div className="flex items-center gap-3">
               <span className="text-slate-600">{paidEntries.length}건</span>
               <span className="text-slate-600">{totalCount}명</span>
               <span className="font-semibold text-slate-900">{totalAmount.toLocaleString()}원</span>
+              <span className="text-slate-500 text-xs">결제일: {paidRange}</span>
             </div>
           </div>
 
           {paidEntries.length === 0 ? (
             <p className="p-4 text-sm text-slate-500 text-center">이번 달 결제 내역이 없습니다.</p>
           ) : (
-            <ul className="space-y-2">
-              {paidEntries.map((e) => {
-                const company = companyLookup.get(e.companyId);
-                const pay = e.paymentId ? paymentLookup.get(e.paymentId) : null;
-                const amount = pay ? e.count * pay.unitPrice : 0;
-                return (
-                  <li key={e.id} className="rounded-xl border border-slate-200 bg-white">
-                    <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100">
-                      <div className="text-sm font-medium text-slate-900">
-                        {format(parseISO(e.entryDate), 'M/d (EEE)', { locale: ko })}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {pay?.paidAt ? format(new Date(pay.paidAt), 'yyyy-MM-dd') : '-'}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between px-4 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-slate-900">{company?.name ?? '미등록 회사'}</span>
-                        <span className="text-xs text-slate-500 font-mono">#{company?.code ?? '----'}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center justify-center min-w-[2rem] rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
-                          {e.count}
-                        </span>
-                        <span className="inline-flex items-center justify-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                          {amount.toLocaleString()}원
-                        </span>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[70vh] overflow-y-auto">
+              {[leftEntries, rightEntries].map((list, colIdx) => (
+                <div key={colIdx} className="rounded-xl border border-slate-200 bg-white">
+                  <ul className="divide-y divide-slate-100">
+                    {list.map((e) => {
+                      const company = companyLookup.get(e.companyId);
+                      const pay = e.paymentId ? paymentLookup.get(e.paymentId) : null;
+                      const amount = pay ? e.count * pay.unitPrice : 0;
+                      return (
+                        <li key={e.id} className="flex items-center justify-between px-3 py-2 hover:bg-slate-50">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-medium text-slate-900 min-w-[84px]">
+                              {format(parseISO(e.entryDate), 'M/d (EEE)', { locale: ko })}
+                            </span>
+                            <span className="text-xs text-slate-500">결제일 {pay?.paidAt ? format(new Date(pay.paidAt), 'yyyy-MM-dd') : '-'}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center justify-center min-w-[2rem] rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                              {e.count}
+                            </span>
+                            <span className="inline-flex items-center justify-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                              {amount.toLocaleString()}원
+                            </span>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">완료</span>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
           )}
         </div>
         <div className="border-t border-slate-200 px-5 py-3 text-right">
