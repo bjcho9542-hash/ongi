@@ -699,6 +699,8 @@ function LeftPanel({
   signer,
   setSigner,
   onSuccess,
+  disableSubmit,
+  onPreSubmit,
 }: {
   companies: CompanySummary[];
   selectedCompanyId: string | null;
@@ -712,6 +714,8 @@ function LeftPanel({
   signer: string;
   setSigner: (value: string) => void;
   onSuccess: (info: EntrySuccessInfo) => void;
+  disableSubmit: boolean;
+  onPreSubmit: (info: EntrySuccessInfo) => void;
 }) {
   const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
   const initialState: CreateEntryState = {};
@@ -723,9 +727,9 @@ function LeftPanel({
       const companyName = selectedCompany?.name ?? '미등록 회사';
       onSuccess({ companyName, entryDate, count });
     }
-    // state.success가 변경될 때에만 실행되도록 의존성 최소화
+    // state 객체가 제출마다 새로 바뀌므로 동일 메시지여도 동작
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state?.success]);
+  }, [state]);
 
   return (
     <div className={clsx(CARD_CONTAINER, 'p-6 space-y-6')}>
@@ -734,7 +738,15 @@ function LeftPanel({
         <p className={TYPO.subtitle}>회사를 선택하고 4자리 코드를 입력한 후 인원을 등록하세요.</p>
       </div>
 
-      <form action={formAction} className="space-y-4">
+      <form
+        action={formAction}
+        onSubmit={() => {
+          if (selectedCompany) {
+            onPreSubmit({ companyName: selectedCompany.name, entryDate, count });
+          }
+        }}
+        className="space-y-4"
+      >
         {/* 회사 선택 */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-slate-700">회사 선택</label>
@@ -861,20 +873,25 @@ function LeftPanel({
           </div>
         ) : null}
 
-        <button
-          type="submit"
-          className={clsx(
-            "w-full rounded-lg px-4 py-2 text-sm font-medium transition",
-            isCodeValid
-              ? "bg-emerald-600 text-white hover:bg-emerald-700"
-              : "bg-slate-300 text-slate-500 cursor-not-allowed"
-          )}
-          disabled={!isCodeValid}
-        >
-          등록하기
-        </button>
+        <EntrySubmitButton disabled={!isCodeValid || disableSubmit} />
       </form>
     </div>
+  );
+}
+
+function EntrySubmitButton({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={disabled || pending}
+      className={clsx(
+        "w-full rounded-lg px-4 py-2 text-sm font-medium transition",
+        disabled || pending ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-emerald-600 text-white hover:bg-emerald-700"
+      )}
+    >
+      {pending ? '등록 중...' : '등록하기'}
+    </button>
   );
 }
 
@@ -1197,6 +1214,8 @@ export function CounterDashboard({ companies, entries, prevUnpaidEntries, paymen
             signer={signer}
             setSigner={setSigner}
             onSuccess={handleEntrySuccess}
+            disableSubmit={!!entryConfirm?.open}
+            onPreSubmit={handleEntrySuccess}
           />
 
           {/* 등록 확인 토스트 (왼쪽 패널 안쪽에 고정) */}
