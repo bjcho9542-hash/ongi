@@ -237,8 +237,6 @@ function LedgerTable({
   selectedYear: number;
   selectedMonth: number;
 }) {
-  const grouped = useMemo(() => groupEntries(entries), [entries]);
-
   const toggleEntry = (id: string) => {
     setSelectedEntryIds(
       selectedEntryIds.includes(id)
@@ -247,16 +245,19 @@ function LedgerTable({
     );
   };
 
-
   const pendingCount = selectedEntries.reduce((sum, entry) => sum + entry.count, 0);
 
-  const paymentLookup = useMemo(() => {
-    const map = new Map<string, PaymentSummary>();
-    for (const payment of payments) {
-      map.set(payment.id, payment);
-    }
-    return map;
-  }, [payments]);
+  const currentMonth = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}`;
+  const prevMonthEntries = entries.filter(e => !e.isPaid && !e.entryDate.startsWith(currentMonth));
+  const prevMonthCount = prevMonthEntries.reduce((sum, e) => sum + e.count, 0);
+  const monthEntries = entries
+    .filter(e => e.entryDate.startsWith(currentMonth))
+    .sort((a, b) => a.entryDate.localeCompare(b.entryDate));
+  const leftEntries = monthEntries.filter((_, idx) => idx % 2 === 0);
+  const rightEntries = monthEntries.filter((_, idx) => idx % 2 === 1);
+
+  const allUnpaidIds = entries.filter(e => !e.isPaid).map(e => e.id);
+  const allSelected = allUnpaidIds.length > 0 && allUnpaidIds.every(id => selectedEntryIds.includes(id));
 
   return (
     <div className={clsx(CARD_CONTAINER, 'p-6 space-y-6')}>
@@ -266,116 +267,55 @@ function LedgerTable({
           <p className={TYPO.subtitle}>체크박스를 선택하여 결제 처리하세요.</p>
         </div>
       </div>
+      <div className="space-y-3">
+        {/* 전체 선택 */}
+        <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={() => {
+              setSelectedEntryIds(allSelected ? [] : allUnpaidIds);
+            }}
+            className="h-4 w-4"
+          />
+          <span className="text-sm text-slate-700">미결제 전체 선택</span>
+        </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        {grouped.length === 0 ? (
+        {/* 전월 미결제 합계 */}
+        {prevMonthCount > 0 ? (
+          <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={prevMonthEntries.every(e => selectedEntryIds.includes(e.id))}
+                onChange={() => {
+                  const ids = prevMonthEntries.map(e => e.id);
+                  const all = ids.every(id => selectedEntryIds.includes(id));
+                  setSelectedEntryIds(all ? selectedEntryIds.filter(id => !ids.includes(id)) : [...selectedEntryIds, ...ids.filter(id => !selectedEntryIds.includes(id))]);
+                }}
+                className="h-4 w-4"
+              />
+              <span className="text-sm font-medium text-amber-700">전월 미결제</span>
+            </div>
+            <span className="inline-flex items-center justify-center min-w-[2rem] rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+              {prevMonthCount}
+            </span>
+          </div>
+        ) : null}
+
+        {/* 이번 달 목록: 2단 분할 */}
+        {monthEntries.length === 0 ? (
           <p className="p-4 text-sm text-slate-500 text-center">등록된 장부가 없습니다.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="w-8 px-2 py-2">
-                    <input
-                      type="checkbox"
-                      checked={entries.filter(e => !e.isPaid).length > 0 && entries.filter(e => !e.isPaid).every(e => selectedEntryIds.includes(e.id))}
-                      onChange={() => {
-                        const unpaidIds = entries.filter(e => !e.isPaid).map(e => e.id);
-                        const allSelected = unpaidIds.every(id => selectedEntryIds.includes(id));
-                        setSelectedEntryIds(allSelected ? [] : unpaidIds);
-                      }}
-                      className="h-4 w-4"
-                    />
-                  </th>
-                  <th className="px-3 py-2 text-left font-medium text-slate-700">날짜</th>
-                  <th className="px-3 py-2 text-left font-medium text-slate-700">회사명</th>
-                  <th className="px-3 py-2 text-center font-medium text-slate-700">인원수</th>
-                  <th className="px-3 py-2 text-left font-medium text-slate-700">서명자</th>
-                  <th className="px-3 py-2 text-center font-medium text-slate-700">결제여부</th>
-                  <th className="px-3 py-2 text-center font-medium text-slate-700">영수증</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {/* 전월 미결제 건이 있다면 상단에 표시 */}
-                {(() => {
-                  const currentMonth = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}`;
-                  const prevMonthEntries = entries.filter(e =>
-                    !e.isPaid && !e.entryDate.startsWith(currentMonth)
-                  );
-                  const prevMonthCount = prevMonthEntries.reduce((sum, e) => sum + e.count, 0);
-
-                  if (prevMonthCount > 0) {
-                    return (
-                      <tr className="bg-amber-50 border-amber-200">
-                        <td className="px-2 py-2">
-                          <input
-                            type="checkbox"
-                            checked={prevMonthEntries.every(e => selectedEntryIds.includes(e.id))}
-                            onChange={() => {
-                              const prevMonthIds = prevMonthEntries.map(e => e.id);
-                              const allSelected = prevMonthIds.every(id => selectedEntryIds.includes(id));
-                              if (allSelected) {
-                                setSelectedEntryIds(selectedEntryIds.filter(id => !prevMonthIds.includes(id)));
-                              } else {
-                                setSelectedEntryIds([...selectedEntryIds, ...prevMonthIds.filter(id => !selectedEntryIds.includes(id))]);
-                              }
-                            }}
-                            className="h-4 w-4"
-                          />
-                        </td>
-                        <td className="px-3 py-2 text-amber-700 font-medium">
-                          전월 미결제
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-slate-900">{entries[0]?.companyName}</span>
-                            <span className="text-xs text-slate-500 font-mono">#{entries[0]?.companyCode}</span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <span className="inline-flex items-center justify-center min-w-[2rem] rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                            {prevMonthCount}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-slate-600">
-                          -
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                            <span>○</span>
-                            미결제
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <span className="text-xs text-slate-400">-</span>
-                        </td>
-                      </tr>
-                    );
-                  }
-                  return null;
-                })()}
-
-                {entries
-                  .filter(entry => {
-                    const currentMonth = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}`;
-                    return entry.entryDate.startsWith(currentMonth);
-                  })
-                  .sort((a, b) => a.entryDate.localeCompare(b.entryDate))
-                  .map((entry) => {
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {[leftEntries, rightEntries].map((list, colIdx) => (
+              <div key={colIdx} className="rounded-xl border border-slate-200 bg-white">
+                <ul className="divide-y divide-slate-100">
+                  {list.map((entry) => {
                     const isSelected = selectedEntryIds.includes(entry.id);
-                    const payment = entry.paymentId ? paymentLookup.get(entry.paymentId) : null;
                     return (
-                      <tr
-                        key={entry.id}
-                        className={clsx(
-                          'hover:bg-slate-50 transition-colors',
-                          {
-                            'bg-emerald-50': isSelected && !entry.isPaid,
-                            'opacity-60': entry.isPaid,
-                          },
-                        )}
-                      >
-                        <td className="px-2 py-2">
+                      <li key={entry.id} className={clsx('flex items-center justify-between px-3 py-2 hover:bg-slate-50', { 'opacity-60': entry.isPaid })}>
+                        <div className="flex items-center gap-3">
                           <input
                             type="checkbox"
                             checked={isSelected}
@@ -383,52 +323,26 @@ function LedgerTable({
                             disabled={entry.isPaid}
                             className="h-4 w-4"
                           />
-                        </td>
-                        <td className="px-3 py-2 text-slate-900 font-medium">
-                          {format(parseISO(entry.entryDate), 'M/d (EEE)', { locale: ko })}
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-slate-900">{entry.companyName}</span>
-                            <span className="text-xs text-slate-500 font-mono">#{entry.companyCode}</span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 text-center">
+                          <span className="text-sm font-medium text-slate-900 min-w-[84px]">
+                            {format(parseISO(entry.entryDate), 'M/d (EEE)', { locale: ko })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
                           <span className="inline-flex items-center justify-center min-w-[2rem] rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
                             {entry.count}
                           </span>
-                        </td>
-                        <td className="px-3 py-2 text-slate-600">
-                          {entry.signer || '-'}
-                        </td>
-                        <td className="px-3 py-2 text-center">
                           {entry.isPaid ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                              <span>✓</span>
-                              완료
-                            </span>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">완료</span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                              <span>○</span>
-                              미결제
-                            </span>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">미결제</span>
                           )}
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          {entry.isPaid && payment ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
-                              <span>🧾</span>
-                              있음
-                            </span>
-                          ) : (
-                            <span className="text-xs text-slate-400">-</span>
-                          )}
-                        </td>
-                      </tr>
+                        </div>
+                      </li>
                     );
                   })}
-              </tbody>
-            </table>
+                </ul>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -497,8 +411,8 @@ function ReceiptModal({ preview, onClose }: { preview: ReceiptPreview; onClose: 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-8">
-      <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+      <div className="w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
           <div>
             <h3 className={TYPO.sectionTitle}>영수증 미리보기</h3>
             <p className={TYPO.subtitle}>{preview.companyName} · {preview.period}</p>
@@ -977,7 +891,7 @@ function PaymentModal({ open, onClose, entryIds, entries, onSuccess }: PaymentMo
           </button>
         </div>
 
-        <div className="max-h-[60vh] space-y-4 overflow-y-auto px-6 py-5">
+        <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4 max-h-[50vh]">
           {fetchError ? (
             <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-600">{fetchError}</p>
           ) : null}
@@ -993,13 +907,13 @@ function PaymentModal({ open, onClose, entryIds, entries, onSuccess }: PaymentMo
           </div>
         </div>
 
-        <div className="border-t border-slate-200 px-6 py-5">
+        <div className="border-t border-slate-200 px-5 py-4">
           <form action={formAction} encType="multipart/form-data" className="space-y-4">
             {entryIds.map((id) => (
               <input key={id} type="hidden" name="entryIds" value={id} />
             ))}
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-xs font-medium text-slate-600">시작일</label>
                 <input
@@ -1025,7 +939,7 @@ function PaymentModal({ open, onClose, entryIds, entries, onSuccess }: PaymentMo
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <label htmlFor="unitPrice" className="text-xs font-medium text-slate-600">
                   단가 (원)
