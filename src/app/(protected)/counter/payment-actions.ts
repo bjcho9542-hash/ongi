@@ -175,6 +175,7 @@ export async function completePayment(_: CompletePaymentState, formData: FormDat
       total_count: totalCount,
       unit_price: unitPrice,
       paid_by: session.sub,
+      paid_at: new Date().toISOString(),
     })
     .select('id')
     .single();
