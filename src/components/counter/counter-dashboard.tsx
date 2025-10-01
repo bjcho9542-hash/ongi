@@ -714,7 +714,9 @@ function LeftPanel({
       const companyName = selectedCompany?.name ?? '미등록 회사';
       onSuccess({ companyName, entryDate, count });
     }
-  }, [state?.success, onSuccess, selectedCompany?.name, entryDate, count]);
+    // state.success가 변경될 때에만 실행되도록 의존성 최소화
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.success]);
 
   return (
     <div className={clsx(CARD_CONTAINER, 'p-6 space-y-6')}>
@@ -1110,9 +1112,9 @@ export function CounterDashboard({ companies, entries, payments, selectedYear, s
       ? '동일한 회사의 항목만 선택할 수 있습니다.'
       : null;
 
-  const handleEntrySuccess = (info: EntrySuccessInfo) => {
+  const handleEntrySuccess = useCallback((info: EntrySuccessInfo) => {
     setEntryConfirm({ open: true, ...info });
-  };
+  }, []);
 
   const handleEntryConfirmClose = useCallback(() => {
     setEntryConfirm(null);
@@ -1296,8 +1298,8 @@ function EntryConfirmModal({ open, companyName, entryDate, count, onClose }: Ent
   if (!open) return null;
 
   return (
-    <div className="absolute left-4 right-4 top-4 z-40">
-      <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+      <div className="pointer-events-auto w-[90%] max-w-md overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-emerald-100 px-4 py-3">
           <h3 className={TYPO.sectionTitle}>방문 등록 완료</h3>
           <button onClick={onClose} className="text-xs text-slate-500 hover:text-slate-900">닫기</button>
