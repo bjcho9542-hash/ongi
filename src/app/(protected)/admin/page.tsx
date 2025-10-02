@@ -9,6 +9,7 @@ import { getServiceSupabaseClient } from '@/lib/supabase/service-client';
 export const revalidate = 0;
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_PATTERN = /^[0-9a-fA-F-]{36}$/;
 
 function toStringParam(value: string | string[] | undefined): string | undefined {
   if (!value) {
@@ -32,12 +33,13 @@ export default async function AdminPage({
   const defaultStart = format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd');
   const defaultEnd = format(now, 'yyyy-MM-dd');
 
-  const companyQuery = (toStringParam(searchParams.company) ?? '').trim();
+  const companyIdParam = toStringParam(searchParams.companyId);
   const startParam = toStringParam(searchParams.start);
   const endParam = toStringParam(searchParams.end);
 
   let startDate = startParam && DATE_PATTERN.test(startParam) ? startParam : defaultStart;
   let endDate = endParam && DATE_PATTERN.test(endParam) ? endParam : defaultEnd;
+  const companyId = companyIdParam && UUID_PATTERN.test(companyIdParam) ? companyIdParam : '';
 
   if (startDate > endDate) {
     const temp = startDate;
@@ -47,19 +49,25 @@ export default async function AdminPage({
 
   const supabase = getServiceSupabaseClient();
 
+  const paymentQuery = supabase
+    .from('payment')
+    .select(
+      'id, company_id, from_date, to_date, total_count, total_amount, unit_price, paid_at, receipt_url, company:company(name, code)'
+    )
+    .gte('paid_at', `${startDate}T00:00:00`)
+    .lte('paid_at', `${endDate}T23:59:59`)
+    .order('paid_at', { ascending: false });
+
+  if (companyId) {
+    paymentQuery.eq('company_id', companyId);
+  }
+
   const [companyRes, paymentRes] = await Promise.all([
     supabase
       .from('company')
       .select('id, name, code, contact_name, contact_phone, business_number, address')
       .order('name', { ascending: true }),
-    supabase
-      .from('payment')
-      .select(
-        'id, company_id, from_date, to_date, total_count, total_amount, unit_price, paid_at, receipt_url, company:company(name, code)'
-      )
-      .gte('paid_at', `${startDate}T00:00:00`)
-      .lte('paid_at', `${endDate}T23:59:59`)
-      .order('paid_at', { ascending: false }),
+    paymentQuery,
   ]);
 
   const companies: CompanySummary[] = (companyRes.data ?? []).map((company) => ({
@@ -72,8 +80,7 @@ export default async function AdminPage({
     address: (company as any).address ?? null,
   }));
 
-  const payments: AdminPaymentRow[] = (paymentRes.data ?? [])
-    .map((payment) => ({
+  const payments: AdminPaymentRow[] = (paymentRes.data ?? []).map((payment) => ({
       id: (payment as any).id,
       companyId: (payment as any).company_id,
       companyName: (payment as any).company?.name ?? '미등록 회사',
@@ -85,21 +92,13 @@ export default async function AdminPage({
       unitPrice: (payment as any).unit_price,
       paidAt: (payment as any).paid_at,
       receiptUrl: (payment as any).receipt_url,
-    }))
-    .filter((payment) => {
-      if (!companyQuery) {
-        return true;
-      }
-      const keyword = companyQuery.toLowerCase();
-      const haystack = `${payment.companyName} ${payment.companyCode}`.toLowerCase();
-      return haystack.includes(keyword);
-    });
+    }));
 
   return (
     <AdminDashboard
       companies={companies}
       payments={payments}
-      searchDefaults={{ company: companyQuery, start: startDate, end: endDate }}
+      searchDefaults={{ companyId, start: startDate, end: endDate }}
     />
   );
 }

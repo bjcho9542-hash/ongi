@@ -8,7 +8,6 @@ import { format } from 'date-fns';
 
 import { AdminCompanyManager } from '@/components/admin/admin-company-manager';
 import { AdminPinManager } from '@/components/admin/admin-pin-manager';
-import { CsvExport } from '@/components/admin/csv-export';
 import type { CompanySummary } from '@/components/counter/counter-dashboard';
 import { getReceiptSignedUrl } from '@/app/(protected)/counter/payment-actions';
 import { getPaymentDetail, type PaymentDetailResult } from '@/app/(protected)/admin/payment-actions';
@@ -31,7 +30,7 @@ type AdminDashboardProps = {
   companies: CompanySummary[];
   payments: AdminPaymentRow[];
   searchDefaults: {
-    company: string;
+    companyId: string;
     start: string;
     end: string;
   };
@@ -64,13 +63,12 @@ export function AdminDashboard({ companies, payments, searchDefaults }: AdminDas
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [companyInput, setCompanyInput] = useState(searchDefaults.company);
+  const [selectedCompanyId, setSelectedCompanyId] = useState(searchDefaults.companyId);
   const [startDate, setStartDate] = useState(searchDefaults.start);
   const [endDate, setEndDate] = useState(searchDefaults.end);
 
   const [showCompanyModal, setShowCompanyModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
@@ -86,6 +84,9 @@ export function AdminDashboard({ companies, payments, searchDefaults }: AdminDas
   const [detailPaymentId, setDetailPaymentId] = useState<string | null>(null);
   const [isDetailPending, startDetailTransition] = useTransition();
 
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [isExporting, startExporting] = useTransition();
+
   const metrics = useMemo(() => {
     const totalAmount = payments.reduce((sum, payment) => sum + (payment.totalAmount ?? 0), 0);
     const totalCount = payments.reduce((sum, payment) => sum + (payment.totalCount ?? 0), 0);
@@ -100,10 +101,10 @@ export function AdminDashboard({ companies, payments, searchDefaults }: AdminDas
     event.preventDefault();
     const params = new URLSearchParams(searchParams?.toString() ?? '');
 
-    if (companyInput) {
-      params.set('company', companyInput);
+    if (selectedCompanyId) {
+      params.set('companyId', selectedCompanyId);
     } else {
-      params.delete('company');
+      params.delete('companyId');
     }
 
     if (startDate) {
@@ -123,7 +124,7 @@ export function AdminDashboard({ companies, payments, searchDefaults }: AdminDas
   };
 
   const handleReset = () => {
-    setCompanyInput('');
+    setSelectedCompanyId('');
     setStartDate(searchDefaults.start);
     setEndDate(searchDefaults.end);
     router.replace('?', { scroll: false });
@@ -201,6 +202,113 @@ export function AdminDashboard({ companies, payments, searchDefaults }: AdminDas
   const receiptLoadingId = isReceiptPending ? receiptPaymentId : null;
   const detailLoadingId = isDetailPending ? detailPaymentId : null;
 
+  const handleExportExcel = () => {
+    startExporting(async () => {
+      try {
+        if (payments.length === 0) {
+          setExportMessage('내보낼 결제 데이터가 없습니다.');
+          return;
+        }
+        setExportMessage(null);
+        const header = ['회사명', '회사코드', '결제일', '기간(시작)', '기간(종료)', '수량', '단가', '금액'];
+        const rows = payments.map((payment) => {
+          const paidDate = payment.paidAt ? format(new Date(payment.paidAt), 'yyyy-MM-dd') : '-';
+          return [
+            payment.companyName,
+            payment.companyCode,
+            paidDate,
+            payment.fromDate,
+            payment.toDate,
+            payment.totalCount.toString(),
+            payment.unitPrice.toString(),
+            payment.totalAmount.toString(),
+          ]
+            .map((value) => `"${value.replace(/"/g, '""')}"`)
+            .join(',');
+        });
+        const csvContent = [header.join(','), ...rows].join('\n');
+        const BOM = '\uFEFF';
+        const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+        downloadBlob(blob, `payments_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.csv`);
+        setExportMessage('엑셀 파일을 다운로드했습니다.');
+      } catch (error) {
+        console.error('excel export failed', error);
+        setExportMessage('엑셀 파일 생성에 실패했습니다.');
+      }
+    });
+  };
+
+  const handleExportPdf = () => {
+    if (payments.length === 0) {
+      setExportMessage('내보낼 결제 데이터가 없습니다.');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      setExportMessage('팝업이 차단되었습니다. 팝업 차단을 해제해주세요.');
+      return;
+    }
+
+    const rows = payments
+      .map((payment) => {
+        const paidDate = payment.paidAt ? format(new Date(payment.paidAt), 'yyyy-MM-dd') : '-';
+        return `
+          <tr>
+            <td>${payment.companyName}</td>
+            <td>${payment.companyCode}</td>
+            <td>${paidDate}</td>
+            <td>${payment.fromDate} ~ ${payment.toDate}</td>
+            <td style="text-align:right;">${payment.totalCount.toLocaleString()}명</td>
+            <td style="text-align:right;">${payment.totalAmount.toLocaleString()}원</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    const doc = printWindow.document;
+    doc.open();
+    doc.write(`
+      <html>
+        <head>
+          <title>결제 내역</title>
+          <style>
+            body { font-family: 'Pretendard', 'Apple SD Gothic Neo', sans-serif; margin: 24px; }
+            h1 { font-size: 20px; margin-bottom: 16px; }
+            table { border-collapse: collapse; width: 100%; }
+            th, td { border: 1px solid #d1d5db; padding: 8px 12px; font-size: 12px; }
+            th { background-color: #f1f5f9; text-align: left; }
+          </style>
+        </head>
+        <body>
+          <h1>결제 내역 (${startDate} ~ ${endDate})</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>회사명</th>
+                <th>회사코드</th>
+                <th>결제일</th>
+                <th>기간</th>
+                <th style="text-align:right;">수량</th>
+                <th style="text-align:right;">금액</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+          <script>
+            window.onload = function() {
+              window.print();
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    doc.close();
+    setExportMessage('PDF 인쇄 창이 열렸습니다. 저장을 선택해주세요.');
+  };
+
   return (
     <div className="space-y-8">
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -216,9 +324,6 @@ export function AdminDashboard({ companies, payments, searchDefaults }: AdminDas
             <button type="button" onClick={() => setShowPinModal(true)} className={BUTTON.subtle}>
               PIN 관리
             </button>
-            <button type="button" onClick={() => setShowExportModal(true)} className={BUTTON.subtle}>
-              데이터 내보내기
-            </button>
           </div>
         </div>
       </div>
@@ -232,14 +337,19 @@ export function AdminDashboard({ companies, payments, searchDefaults }: AdminDas
             <label htmlFor="company-search" className="text-xs font-medium text-slate-600">
               회사 검색
             </label>
-            <input
+            <select
               id="company-search"
-              type="text"
-              value={companyInput}
-              onChange={(event) => setCompanyInput(event.target.value)}
-              placeholder="회사명 또는 코드 입력"
+              value={selectedCompanyId}
+              onChange={(event) => setSelectedCompanyId(event.target.value)}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
-            />
+            >
+              <option value="">전체 회사</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name} ({company.code})
+                </option>
+              ))}
+            </select>
           </div>
           <div className="space-y-2">
             <label htmlFor="start-date" className="text-xs font-medium text-slate-600">
@@ -361,6 +471,27 @@ export function AdminDashboard({ companies, payments, searchDefaults }: AdminDas
             </tbody>
           </table>
         </div>
+
+        <div className="mt-6 border-t border-slate-200 pt-4">
+          <h3 className="text-sm font-semibold text-slate-900">데이터 내보내기</h3>
+          <p className="mt-1 text-xs text-slate-500">현재 검색 결과를 원하는 형식으로 저장하세요.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={isExporting}
+              className={BUTTON.primary}
+            >
+              {isExporting ? '내보내는 중...' : '엑셀로 내보내기'}
+            </button>
+            <button type="button" onClick={handleExportPdf} className={BUTTON.subtle}>
+              PDF로 내보내기
+            </button>
+          </div>
+          {exportMessage ? (
+            <p className="mt-3 text-sm text-slate-600">{exportMessage}</p>
+          ) : null}
+        </div>
       </div>
 
       <ModalShell
@@ -382,17 +513,6 @@ export function AdminDashboard({ companies, payments, searchDefaults }: AdminDas
       >
         <div className="pb-2">
           <AdminPinManager />
-        </div>
-      </ModalShell>
-
-      <ModalShell
-        open={showExportModal}
-        onClose={() => setShowExportModal(false)}
-        title="데이터 내보내기"
-        sizeClass="max-w-3xl"
-      >
-        <div className="pb-2">
-          <CsvExport />
         </div>
       </ModalShell>
 
@@ -522,7 +642,7 @@ function ReceiptModal({
                 />
               </div>
             ) : (
-              <p className="text-sm text-slate-500">지원하지 않는 파일 형식입니다. 새 창에서 열어 확인하세요.</p>
+              <p className="text-sm text-slate-500">지원하지 않는 파일 형식입니다. 새 창에서 열어 확인해주세요.</p>
             )}
           </div>
         ) : !error ? (
@@ -634,4 +754,15 @@ function PaymentDetailModal({
       </div>
     </ModalShell>
   );
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
 }
