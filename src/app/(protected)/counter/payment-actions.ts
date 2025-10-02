@@ -3,7 +3,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 
 import { getServiceSupabaseClient } from '@/lib/supabase/service-client';
 import { getSession } from '@/lib/auth/session';
@@ -11,12 +11,6 @@ import { getSession } from '@/lib/auth/session';
 const prepareSchema = z.object({
   entryIds: z.array(z.string().uuid()).min(1),
 });
-
-function addDays(dateString: string, days: number) {
-  const date = parseISO(dateString);
-  date.setUTCDate(date.getUTCDate() + days);
-  return format(date, 'yyyy-MM-dd');
-}
 
 export type PaymentPreparationResult = {
   companyId: string;
@@ -62,19 +56,11 @@ export async function preparePayment(entryIds: string[]): Promise<PaymentPrepara
   const companyId = entryRows[0].company_id;
   const companyName = entryRows[0].company?.name ?? '미등록 회사';
 
-  const { data: lastPayment } = await supabase
-    .from('payment')
-    .select('to_date')
-    .eq('company_id', companyId)
-    .order('to_date', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
   const earliestEntryDate = entryRows.reduce((earliest, entry) =>
     entry.entry_date < earliest ? entry.entry_date : earliest,
   entryRows[0].entry_date);
 
-  const fromDate = lastPayment?.to_date ? addDays(lastPayment.to_date, 1) : earliestEntryDate;
+  const fromDate = earliestEntryDate;
   const today = format(new Date(), 'yyyy-MM-dd');
   const totalCount = entryRows.reduce((sum, entry) => sum + entry.count, 0);
 
@@ -150,15 +136,7 @@ export async function completePayment(_: CompletePaymentState, formData: FormDat
     entry.entry_date > latest ? entry.entry_date : latest,
   entryRows[0].entry_date);
 
-  const { data: lastPayment } = await supabase
-    .from('payment')
-    .select('to_date')
-    .eq('company_id', companyId)
-    .order('to_date', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const expectedFromDate = lastPayment?.to_date ? addDays(lastPayment.to_date, 1) : earliestEntryDate;
+  const fromDate = earliestEntryDate;
 
   if (toDate < latestEntryDate) {
     return { error: '종료일은 선택한 장부의 가장 최근 날짜보다 빠를 수 없습니다.' };
@@ -170,7 +148,7 @@ export async function completePayment(_: CompletePaymentState, formData: FormDat
     .from('payment')
     .insert({
       company_id: companyId,
-      from_date: expectedFromDate,
+      from_date: fromDate,
       to_date: toDate,
       total_count: totalCount,
       unit_price: unitPrice,

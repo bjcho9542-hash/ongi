@@ -51,8 +51,8 @@ export default async function CounterPage({
     supabase
       .from('payment')
       .select('id, company_id, from_date, to_date, total_count, total_amount, unit_price, paid_at, receipt_url')
-      .gte('from_date', startDate)
-      .lte('to_date', endDate)
+      .lte('from_date', endDate)
+      .gte('to_date', startDate)
       .order('paid_at', { ascending: false }),
     supabase
       .from('entry')
