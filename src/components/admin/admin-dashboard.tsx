@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, useTransition, type FormEvent, type ReactNode } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
@@ -11,6 +11,7 @@ import { AdminPinManager } from '@/components/admin/admin-pin-manager';
 import type { CompanySummary } from '@/components/counter/counter-dashboard';
 import { getReceiptSignedUrl } from '@/app/(protected)/counter/payment-actions';
 import { getPaymentDetail, type PaymentDetailResult } from '@/app/(protected)/admin/payment-actions';
+import { getServiceSupabaseClient } from '@/lib/supabase/service-client';
 
 export type AdminPaymentRow = {
   id: string;
@@ -311,6 +312,8 @@ export function AdminDashboard({ companies, payments, searchDefaults }: AdminDas
 
   return (
     <div className="space-y-8">
+      <TodayVisitDashboard companies={companies} />
+
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -753,6 +756,98 @@ function PaymentDetailModal({
         ) : null}
       </div>
     </ModalShell>
+  );
+}
+
+function TodayVisitDashboard({ companies }: { companies: CompanySummary[] }) {
+  const [stats, setStats] = useState<Array<{ companyId: string; companyName: string; todayCount: number; monthCount: number }>>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const monthStart = format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd');
+      const monthEnd = format(new Date(), 'yyyy-MM-dd');
+
+      const supabase = getServiceSupabaseClient();
+
+      const companyStats = await Promise.all(
+        companies.map(async (company) => {
+          const [todayResult, monthResult] = await Promise.all([
+            supabase
+              .from('entry')
+              .select('count')
+              .eq('company_id', company.id)
+              .eq('entry_date', today),
+            supabase
+              .from('entry')
+              .select('count')
+              .eq('company_id', company.id)
+              .gte('entry_date', monthStart)
+              .lte('entry_date', monthEnd),
+          ]);
+
+          const todayCount = (todayResult.data ?? []).reduce((sum, e) => sum + e.count, 0);
+          const monthCount = (monthResult.data ?? []).reduce((sum, e) => sum + e.count, 0);
+
+          return {
+            companyId: company.id,
+            companyName: company.name,
+            todayCount,
+            monthCount,
+          };
+        })
+      );
+
+      setStats(companyStats.filter(s => s.monthCount > 0).sort((a, b) => b.todayCount - a.todayCount));
+      setLoading(false);
+    };
+
+    loadStats();
+  }, [companies]);
+
+  const totalToday = stats.reduce((sum, s) => sum + s.todayCount, 0);
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-slate-900">오늘 방문 업체 카운팅</h2>
+        <p className="mt-1 text-sm text-slate-500">오늘과 이번 달 방문 인원을 회사별로 확인하세요.</p>
+      </div>
+
+      {loading ? (
+        <div className="py-8 text-center text-sm text-slate-500">불러오는 중...</div>
+      ) : stats.length === 0 ? (
+        <div className="py-8 text-center text-sm text-slate-500">이번 달 방문 기록이 없습니다.</div>
+      ) : (
+        <>
+          <div className="overflow-hidden rounded-lg border border-slate-200">
+            <table className="w-full border-collapse text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-2 text-left">회사</th>
+                  <th className="px-4 py-2 text-right">오늘 방문 인원</th>
+                  <th className="px-4 py-2 text-right">이번달 합계인원</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {stats.map((stat) => (
+                  <tr key={stat.companyId}>
+                    <td className="px-4 py-3 font-medium text-slate-900">{stat.companyName}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-emerald-600">{stat.todayCount}명</td>
+                    <td className="px-4 py-3 text-right text-slate-600">{stat.monthCount}명</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-4 flex items-center justify-between rounded-lg bg-emerald-50 px-4 py-3">
+            <span className="text-sm font-medium text-emerald-900">오늘 총 합계</span>
+            <span className="text-lg font-bold text-emerald-600">{totalToday}명</span>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

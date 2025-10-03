@@ -43,7 +43,7 @@ export default async function CounterPage({
     supabase
       .from('entry')
       .select(
-        'id, company_id, entry_date, count, signer, is_paid, payment_id, company:company(id, name, code)'
+        'id, company_id, entry_date, count, signer, is_paid, payment_id, created_at, company:company(id, name, code)'
       )
       .gte('entry_date', startDate)
       .lte('entry_date', endDate)
@@ -57,7 +57,7 @@ export default async function CounterPage({
     supabase
       .from('entry')
       .select(
-        'id, company_id, entry_date, count, signer, is_paid, payment_id, company:company(id, name, code)'
+        'id, company_id, entry_date, count, signer, is_paid, payment_id, created_at, company:company(id, name, code)'
       )
       .lt('entry_date', startDate)
       .is('is_paid', false)
@@ -84,6 +84,7 @@ export default async function CounterPage({
     signer: entry.signer,
     isPaid: entry.is_paid ?? false,
     paymentId: entry.payment_id,
+    createdAt: entry.created_at,
   }));
 
   const prevUnpaidEntries: LedgerEntry[] = (prevUnpaidRows ?? []).map((entry) => ({
@@ -96,6 +97,7 @@ export default async function CounterPage({
     signer: entry.signer,
     isPaid: entry.is_paid ?? false,
     paymentId: entry.payment_id,
+    createdAt: entry.created_at,
   }));
 
   const payments: PaymentSummary[] = (paymentRows ?? []).map((payment) => ({

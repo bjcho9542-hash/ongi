@@ -38,6 +38,7 @@ export type LedgerEntry = {
   signer: string | null;
   isPaid: boolean;
   paymentId: string | null;
+  createdAt: string;
 };
 
 export type PaymentSummary = {
@@ -332,8 +333,8 @@ function LedgerTable({
                             onChange={() => toggleEntry(entry.id)}
                             className="h-4 w-4"
                           />
-                          <span className="text-sm font-medium text-slate-900 min-w-[84px]">
-                            {format(parseISO(entry.entryDate), 'M/d (EEE)', { locale: ko })}
+                          <span className="text-sm font-medium text-slate-900 min-w-[120px]">
+                            {format(parseISO(entry.createdAt), 'M/d HH:mm', { locale: ko })}
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
@@ -1207,12 +1208,19 @@ export function CounterDashboard({ companies, entries, prevUnpaidEntries, paymen
           <MonthSelector year={selectedYear} month={selectedMonth} />
         </div>
         <div className="text-center">
-          <h1 className={TYPO.pageTitle}>온기한식뷔페 회사별 장부 시스템</h1>
+          <h1 className={TYPO.pageTitle}>온기한식뷔페</h1>
           <p className={TYPO.subtitle}>
             {selectedYear}년 {selectedMonth}월 기준. {session.name ?? '사용자'}님 안녕하세요!
           </p>
         </div>
-        <div></div>
+        <div className="text-right">
+          <p className="text-sm font-medium text-slate-600">방문고객</p>
+          <p className="text-xl font-bold text-emerald-600">
+            {entries
+              .filter(e => e.entryDate === today)
+              .reduce((sum, e) => sum + e.count, 0)}명
+          </p>
+        </div>
       </div>
 
       {paymentMessage ? (
