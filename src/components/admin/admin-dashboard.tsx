@@ -11,7 +11,7 @@ import { AdminPinManager } from '@/components/admin/admin-pin-manager';
 import type { CompanySummary } from '@/components/counter/counter-dashboard';
 import { getReceiptSignedUrl } from '@/app/(protected)/counter/payment-actions';
 import { getPaymentDetail, type PaymentDetailResult } from '@/app/(protected)/admin/payment-actions';
-import { getServiceSupabaseClient } from '@/lib/supabase/service-client';
+import { getTodayVisitStats, type CompanyStats } from '@/app/(protected)/admin/stats-actions';
 
 export type AdminPaymentRow = {
   id: string;
@@ -760,51 +760,20 @@ function PaymentDetailModal({
 }
 
 function TodayVisitDashboard({ companies }: { companies: CompanySummary[] }) {
-  const [stats, setStats] = useState<Array<{ companyId: string; companyName: string; todayCount: number; monthCount: number }>>([]);
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<CompanyStats[]>([]);
+  const [loading, startLoading] = useTransition();
 
   useEffect(() => {
-    const loadStats = async () => {
-      const today = format(new Date(), 'yyyy-MM-dd');
-      const monthStart = format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd');
-      const monthEnd = format(new Date(), 'yyyy-MM-dd');
-
-      const supabase = getServiceSupabaseClient();
-
-      const companyStats = await Promise.all(
-        companies.map(async (company) => {
-          const [todayResult, monthResult] = await Promise.all([
-            supabase
-              .from('entry')
-              .select('count')
-              .eq('company_id', company.id)
-              .eq('entry_date', today),
-            supabase
-              .from('entry')
-              .select('count')
-              .eq('company_id', company.id)
-              .gte('entry_date', monthStart)
-              .lte('entry_date', monthEnd),
-          ]);
-
-          const todayCount = (todayResult.data ?? []).reduce((sum, e) => sum + e.count, 0);
-          const monthCount = (monthResult.data ?? []).reduce((sum, e) => sum + e.count, 0);
-
-          return {
-            companyId: company.id,
-            companyName: company.name,
-            todayCount,
-            monthCount,
-          };
-        })
-      );
-
-      setStats(companyStats.filter(s => s.monthCount > 0).sort((a, b) => b.todayCount - a.todayCount));
-      setLoading(false);
-    };
-
-    loadStats();
-  }, [companies]);
+    startLoading(async () => {
+      try {
+        const result = await getTodayVisitStats();
+        setStats(result);
+      } catch (error) {
+        console.error('Failed to load visit stats:', error);
+        setStats([]);
+      }
+    });
+  }, []);
 
   const totalToday = stats.reduce((sum, s) => sum + s.todayCount, 0);
 
