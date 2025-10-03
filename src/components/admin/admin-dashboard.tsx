@@ -312,8 +312,6 @@ export function AdminDashboard({ companies, payments, searchDefaults }: AdminDas
 
   return (
     <div className="space-y-8">
-      <TodayVisitDashboard companies={companies} />
-
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -330,6 +328,8 @@ export function AdminDashboard({ companies, payments, searchDefaults }: AdminDas
           </div>
         </div>
       </div>
+
+      <TodayVisitDashboard companies={companies} />
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <form
@@ -762,6 +762,7 @@ function PaymentDetailModal({
 function TodayVisitDashboard({ companies }: { companies: CompanySummary[] }) {
   const [stats, setStats] = useState<CompanyStats[]>([]);
   const [loading, startLoading] = useTransition();
+  const [filter, setFilter] = useState<'visited' | 'not-visited' | 'all'>('visited');
 
   useEffect(() => {
     startLoading(async () => {
@@ -775,41 +776,153 @@ function TodayVisitDashboard({ companies }: { companies: CompanySummary[] }) {
     });
   }, []);
 
+  const visitedStats = stats.filter(s => s.todayCount > 0);
+  const notVisitedStats = stats.filter(s => s.todayCount === 0);
+
+  const displayStats =
+    filter === 'visited' ? visitedStats :
+    filter === 'not-visited' ? notVisitedStats :
+    [...visitedStats, ...notVisitedStats];
+
   const totalToday = stats.reduce((sum, s) => sum + s.todayCount, 0);
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-slate-900">오늘 방문 업체 카운팅</h2>
-        <p className="mt-1 text-sm text-slate-500">오늘과 이번 달 방문 인원을 회사별로 확인하세요.</p>
+      <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">오늘 방문 업체 카운팅</h2>
+          <p className="mt-1 text-sm text-slate-500">오늘과 이번 달 방문 인원을 회사별로 확인하세요.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFilter('visited')}
+            className={clsx(
+              'rounded-lg px-4 py-2 text-sm font-medium transition',
+              filter === 'visited'
+                ? 'bg-emerald-600 text-white'
+                : 'border border-slate-300 text-slate-600 hover:border-slate-400'
+            )}
+          >
+            오늘 방문
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('not-visited')}
+            className={clsx(
+              'rounded-lg px-4 py-2 text-sm font-medium transition',
+              filter === 'not-visited'
+                ? 'bg-emerald-600 text-white'
+                : 'border border-slate-300 text-slate-600 hover:border-slate-400'
+            )}
+          >
+            오늘 방문 안한업체
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('all')}
+            className={clsx(
+              'rounded-lg px-4 py-2 text-sm font-medium transition',
+              filter === 'all'
+                ? 'bg-emerald-600 text-white'
+                : 'border border-slate-300 text-slate-600 hover:border-slate-400'
+            )}
+          >
+            전체
+          </button>
+        </div>
       </div>
 
       {loading ? (
         <div className="py-8 text-center text-sm text-slate-500">불러오는 중...</div>
-      ) : stats.length === 0 ? (
-        <div className="py-8 text-center text-sm text-slate-500">이번 달 방문 기록이 없습니다.</div>
+      ) : displayStats.length === 0 ? (
+        <div className="py-8 text-center text-sm text-slate-500">
+          {filter === 'visited' && '오늘 방문한 업체가 없습니다.'}
+          {filter === 'not-visited' && '모든 업체가 오늘 방문했습니다.'}
+          {filter === 'all' && '등록된 업체가 없습니다.'}
+        </div>
       ) : (
         <>
-          <div className="overflow-hidden rounded-lg border border-slate-200">
-            <table className="w-full border-collapse text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-4 py-2 text-left">회사</th>
-                  <th className="px-4 py-2 text-right">오늘 방문 인원</th>
-                  <th className="px-4 py-2 text-right">이번달 합계인원</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {stats.map((stat) => (
-                  <tr key={stat.companyId}>
-                    <td className="px-4 py-3 font-medium text-slate-900">{stat.companyName}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-emerald-600">{stat.todayCount}명</td>
-                    <td className="px-4 py-3 text-right text-slate-600">{stat.monthCount}명</td>
+          {filter === 'all' ? (
+            <>
+              {visitedStats.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="mb-2 px-2 text-sm font-semibold text-emerald-700">방문 업체</h3>
+                  <div className="overflow-hidden rounded-lg border border-slate-200">
+                    <table className="w-full border-collapse text-sm">
+                      <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                        <tr>
+                          <th className="px-4 py-2 text-left">회사</th>
+                          <th className="px-4 py-2 text-right">오늘 방문 인원</th>
+                          <th className="px-4 py-2 text-right">이번달 합계인원</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {visitedStats.map((stat) => (
+                          <tr key={stat.companyId}>
+                            <td className="px-4 py-3 font-medium text-slate-900">{stat.companyName}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-emerald-600">{stat.todayCount}명</td>
+                            <td className="px-4 py-3 text-right text-slate-600">{stat.monthCount}명</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              {notVisitedStats.length > 0 && (
+                <div>
+                  <h3 className="mb-2 px-2 text-sm font-semibold text-slate-500">미방문 업체</h3>
+                  <div className="overflow-hidden rounded-lg border border-slate-200">
+                    <table className="w-full border-collapse text-sm">
+                      <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                        <tr>
+                          <th className="px-4 py-2 text-left">회사</th>
+                          <th className="px-4 py-2 text-right">오늘 방문 인원</th>
+                          <th className="px-4 py-2 text-right">이번달 합계인원</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {notVisitedStats.map((stat) => (
+                          <tr key={stat.companyId}>
+                            <td className="px-4 py-3 font-medium text-slate-400">{stat.companyName}</td>
+                            <td className="px-4 py-3 text-right text-slate-400">-</td>
+                            <td className="px-4 py-3 text-right text-slate-400">{stat.monthCount}명</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-slate-200">
+              <table className="w-full border-collapse text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-2 text-left">회사</th>
+                    <th className="px-4 py-2 text-right">오늘 방문 인원</th>
+                    <th className="px-4 py-2 text-right">이번달 합계인원</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {displayStats.map((stat) => (
+                    <tr key={stat.companyId}>
+                      <td className="px-4 py-3 font-medium text-slate-900">{stat.companyName}</td>
+                      <td className={clsx(
+                        'px-4 py-3 text-right font-semibold',
+                        stat.todayCount > 0 ? 'text-emerald-600' : 'text-slate-400'
+                      )}>
+                        {stat.todayCount > 0 ? `${stat.todayCount}명` : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-right text-slate-600">{stat.monthCount}명</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <div className="mt-4 flex items-center justify-between rounded-lg bg-emerald-50 px-4 py-3">
             <span className="text-sm font-medium text-emerald-900">오늘 총 합계</span>
             <span className="text-lg font-bold text-emerald-600">{totalToday}명</span>

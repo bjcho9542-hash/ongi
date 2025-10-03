@@ -56,7 +56,11 @@ export async function getTodayVisitStats(): Promise<CompanyStats[]> {
     })
   );
 
-  return companyStats
-    .filter(s => s.monthCount > 0)
-    .sort((a, b) => b.todayCount - a.todayCount);
+  // Return all companies, sorted by today's visit count (descending), then by name
+  return companyStats.sort((a, b) => {
+    if (b.todayCount !== a.todayCount) {
+      return b.todayCount - a.todayCount;
+    }
+    return a.companyName.localeCompare(b.companyName, 'ko');
+  });
 }
